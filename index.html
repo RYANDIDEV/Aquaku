@@ -29,24 +29,26 @@
     button { cursor: pointer; }
     .app { min-height: 100vh; }
     .topbar {
-      height: 70px; padding: 0 max(28px, calc((100vw - 1320px) / 2));
-      display: flex; align-items: center; gap: 42px; background: var(--paper);
+      min-height: 60px; padding: 8px 14px;
+      display: flex; align-items: center; gap: 12px; background: var(--paper);
       border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5;
     }
-    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-size: 19px; font-weight: 780; letter-spacing: -.7px; }
-    .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 12px; color: white; background: var(--green); font-size: 19px; }
-    .brand small { display: block; color: var(--muted); font-size: 10px; font-weight: 550; letter-spacing: .1px; margin-top: 1px; }
-    .nav { display: flex; align-items: stretch; height: 100%; gap: 6px; }
-    .nav button { border: 0; background: transparent; padding: 0 15px; color: #647068; font-weight: 620; border-bottom: 2px solid transparent; }
+    .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: var(--ink); font-size: 17px; font-weight: 780; letter-spacing: -.6px; }
+    .brand-mark { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; overflow: hidden; border: 1px solid rgb(141 187 152 / 25%); border-radius: 12px; background: #14251b; }
+    .brand-mark img { display: block; width: 100%; height: 100%; padding: 2px; object-fit: contain; border-radius: inherit; }
+    .brand small { display: block; color: var(--muted); font-size: 9px; font-weight: 550; letter-spacing: .1px; margin-top: 1px; }
+    .nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 8; display: flex; align-items: stretch; justify-content: space-around; height: calc(62px + env(safe-area-inset-bottom)); padding: 4px 8px env(safe-area-inset-bottom); gap: 3px; border-top: 1px solid var(--line); background: var(--paper); }
+    .nav button { position: relative; display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; min-height: 44px; border: 0; border-radius: 10px; background: transparent; padding: 5px 3px; color: #647068; font-size: 10px; font-weight: 620; }
+    .nav button svg { width: 19px; height: 19px; stroke: currentColor; }
     .nav button.active { color: var(--green); border-bottom-color: var(--green); }
     .top-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
     .location { color: #49564e; font-size: 12px; font-weight: 620; }
     .avatar { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: #e4eee5; color: var(--green); font-weight: 750; }
-    .shell { max-width: 1320px; margin: auto; padding: 27px 28px 60px; }
+    .shell { width: 100%; max-width: 1320px; margin: auto; padding: 18px 14px calc(88px + env(safe-area-inset-bottom)); }
     .page { display: none; }
     .page.active { display: block; }
-    .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr) 254px; gap: 23px; align-items: start; }
-    .sidebar, .rightbar { display: grid; gap: 15px; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+    .sidebar, .rightbar { display: none; gap: 15px; }
     .panel, .card, .feed-card { background: var(--paper); border: 1px solid var(--line); border-radius: 15px; box-shadow: var(--shadow); }
     .sidebar-box { padding: 18px 16px; }
     .side-title { margin: 0 0 14px; color: #8a948d; text-transform: uppercase; font-size: 10px; letter-spacing: 1px; font-weight: 760; }
@@ -59,7 +61,7 @@
     .upgrade-card strong { font-size: 14px; }
     .upgrade-card button { padding: 8px 11px; border: 0; border-radius: 8px; background: var(--lime); color: var(--green-dark); font-size: 11px; font-weight: 720; }
     .content { min-width: 0; }
-    .welcome { display: flex; justify-content: space-between; align-items: end; gap: 18px; margin: 2px 0 20px; }
+    .welcome { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin: 2px 0 18px; }
     .eyebrow { color: var(--green); font-size: 11px; font-weight: 750; letter-spacing: .8px; text-transform: uppercase; }
     h1 { margin: 5px 0 6px; font-size: clamp(24px, 3vw, 31px); letter-spacing: -1.1px; line-height: 1.12; }
     .subtitle { margin: 0; color: var(--muted); font-size: 13px; }
@@ -75,8 +77,9 @@
     .searchbar { display: flex; align-items: center; gap: 9px; height: 43px; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; background: white; }
     .searchbar span { color: #859089; font-size: 17px; }
     .searchbar input { flex: 1; min-width: 0; border: 0; outline: 0; color: var(--ink); font-size: 12px; }
-    .filter-strip { margin: 11px 0 15px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .filter-control { padding: 8px 9px; }
+    .filter-strip { margin: 11px 0 15px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-items: center; }
+    .filter-control { width: 100%; min-width: 0; padding: 10px 9px; }
+    #clear-filters { min-height: 40px; }
     .clear-button { border: 0; background: none; color: var(--green); font-size: 11px; font-weight: 670; }
     .section-label { margin: 19px 0 10px; display: flex; justify-content: space-between; align-items: baseline; color: #79847d; font-size: 11px; }
     .section-label strong { color: var(--ink); font-size: 13px; }
@@ -104,23 +107,23 @@
     .event small { color: var(--orange); font-size: 9px; font-weight: 750; text-transform: uppercase; letter-spacing: .6px; }
     .event strong { display: block; margin: 6px 0 5px; font-size: 12px; }
     .event p { margin: 0; color: #817765; font-size: 10px; line-height: 1.5; }
-    .listing-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+    .listing-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .product-card { overflow: hidden; cursor: pointer; }
-    .product-visual { position: relative; height: 137px; display: grid; place-items: center; overflow: hidden; background: linear-gradient(145deg, #dce9d9, #aec8ac); }
+    .product-visual { position: relative; height: 108px; display: grid; place-items: center; overflow: hidden; background: linear-gradient(145deg, #dce9d9, #aec8ac); }
     .product-visual:before, .product-visual:after { content: ""; position: absolute; border-radius: 50%; background: rgb(255 255 255 / 27%); }
     .product-visual:before { width: 145px; height: 145px; top: -75px; right: -25px; }
     .product-visual:after { width: 95px; height: 95px; bottom: -65px; left: 15px; }
     .product-emoji { font-size: 55px; filter: drop-shadow(0 7px 5px rgb(31 55 36 / 14%)); }
     .condition-stamp { position: absolute; z-index: 1; left: 10px; top: 10px; padding: 5px 8px; border-radius: 20px; background: white; color: #45534a; font-size: 9px; font-weight: 730; }
     .location-stamp { position: absolute; z-index: 1; right: 9px; bottom: 9px; padding: 5px 7px; border-radius: 7px; color: white; background: rgb(25 63 46 / 82%); font-size: 9px; }
-    .product-info { padding: 13px; }
-    .product-info h3 { margin: 9px 0 5px; font-size: 13px; line-height: 1.4; }
+    .product-info { padding: 10px; }
+    .product-info h3 { margin: 9px 0 5px; font-size: 12px; line-height: 1.4; }
     .product-info p { margin: 0; color: #7c877f; font-size: 10px; }
     .price-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
     .price { color: var(--green-dark); font-size: 14px; font-weight: 790; }
     .seller-line { display: flex; gap: 5px; align-items: center; margin-top: 10px; color: #849087; font-size: 10px; }
     .flow-intro { margin-bottom: 22px; }
-    .flow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .flow-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
     .flow-card { padding: 21px; }
     .flow-card h2 { margin: 0 0 5px; font-size: 17px; }
     .flow-card > p { margin: 0 0 19px; color: var(--muted); font-size: 12px; }
@@ -135,7 +138,7 @@
     .tag-guide { margin-top: 22px; padding: 20px; }
     .tag-guide h2 { margin: 0 0 6px; font-size: 16px; }
     .tag-guide > p { margin: 0 0 14px; color: var(--muted); font-size: 11px; }
-    .tag-explain { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+    .tag-explain { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
     .tag-explain > div { padding: 11px; border: 1px solid #edf0ec; border-radius: 9px; }
     .tag-explain p { margin: 7px 0 0; color: #849087; font-size: 10px; line-height: 1.5; }
     .empty-state { padding: 35px 20px; text-align: center; border: 1px dashed #dce4dc; border-radius: 12px; color: var(--muted); font-size: 12px; }
@@ -230,48 +233,68 @@
     body[data-theme="dark"] .form-field label { color: #c0ccc3; }
     body[data-theme="dark"] .product-visual { background: linear-gradient(145deg, #334838, #4a684e); }
     body[data-theme="dark"] .condition-stamp { color: #253229; }
-    @media (max-width: 1050px) {
-      .layout { grid-template-columns: 190px minmax(0, 1fr); }
-      .rightbar { display: none; }
-      .topbar { gap: 24px; }
+    @media (max-width: 360px) {
+      .top-actions { gap: 5px; }
+      .location { display: none; }
+      .brand-mark { width: 34px; height: 34px; flex-basis: 34px; }
+      .listing-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 700px) {
-      .topbar { height: auto; min-height: 61px; padding: 0 15px; gap: 10px; flex-wrap: wrap; }
-      .brand { font-size: 16px; }
-      .brand-mark { width: 30px; height: 30px; }
-      .nav { order: 3; width: 100%; height: 43px; justify-content: space-around; }
-      .nav button { padding: 0 8px; font-size: 11px; }
       .top-actions { gap: 7px; }
       .location { font-size: 10px; }
-      .theme-toggle { padding: 7px 8px; font-size: 0; }
+      .theme-toggle { min-height: 40px; padding: 7px 8px; font-size: 0; }
       .theme-toggle span { font-size: 15px; }
-      .shell { padding: 19px 14px 40px; }
-      .layout { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
-      .welcome { align-items: flex-start; }
       .welcome .button-primary { padding: 9px 10px; font-size: 10px; }
-      .listing-grid { gap: 9px; }
-      .product-visual { height: 110px; }
-      .product-info { padding: 10px; }
-      .product-info h3 { font-size: 12px; }
-      .flow-grid { grid-template-columns: 1fr; }
-      .tag-explain { grid-template-columns: 1fr 1fr; }
-      .tab-row { align-items: flex-start; }
       .tabs button { padding: 8px 9px; font-size: 11px; }
-      .sort-select { max-width: 125px; }
+      .tab-row { align-items: flex-start; }
+    }
+    @media (min-width: 701px) {
+      .topbar { height: 70px; padding: 0 max(24px, calc((100vw - 1320px) / 2)); gap: 24px; }
+      .brand { gap: 10px; font-size: 19px; letter-spacing: -.7px; }
+      .brand-mark { width: 40px; height: 40px; flex-basis: 40px; }
+      .brand small { font-size: 10px; }
+      .nav { position: static; z-index: auto; flex: 1; justify-content: flex-start; height: 100%; padding: 0; gap: 6px; border: 0; background: transparent; }
+      .nav button { flex: 0 0 auto; flex-direction: row; gap: 7px; padding: 0 12px; border-radius: 0; border-bottom: 2px solid transparent; font-size: 13px; }
+      .nav button svg { display: none; }
+      .nav button.active { border-bottom-color: var(--green); }
+      .top-actions { gap: 10px; }
+      .shell { padding: 25px 24px 60px; }
+      .layout { grid-template-columns: 190px minmax(0, 1fr); gap: 20px; }
+      .sidebar { display: grid; }
+      .rightbar { display: none; }
+      .welcome { align-items: flex-end; gap: 18px; margin-bottom: 20px; }
+      .filter-strip { display: flex; flex-wrap: wrap; }
+      .filter-control { width: auto; }
+      .product-visual { height: 137px; }
+      .product-info { padding: 13px; }
+      .product-info h3 { font-size: 13px; }
+      .listing-grid { gap: 13px; }
+      .flow-grid { grid-template-columns: 1fr; }
+      .tag-explain { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (min-width: 1100px) {
+      .topbar { gap: 34px; }
+      .layout { grid-template-columns: 220px minmax(0, 1fr) 254px; gap: 23px; }
+      .rightbar { display: grid; }
+      .flow-grid { grid-template-columns: 1fr 1fr; }
+      .tag-explain { grid-template-columns: repeat(3, 1fr); }
     }
   </style>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
-      <a class="brand" href="#" aria-label="Rimbun, beranda">
-        <span class="brand-mark">✳</span><span>Aquaku<small>komunitas aquascape</small></span>
+      <a class="brand" href="#" aria-label="Aquaku, beranda">
+        <span class="brand-mark">
+          <img src="icon.jpeg" alt="Logo Aquaku" width="30" height="30"/>
+        </span>
+        <span>Aquaku<small>komunitas aquascape</small>
+        </span>
       </a>
       <nav class="nav" aria-label="Navigasi utama">
-        <button data-page="forum">Forum</button>
-        <button class="active" data-page="market">Marketplace</button>
-        <button data-page="flow">Alur Pengguna</button>
+        <button data-page="forum"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6a7.5 7.5 0 1 1 17-3.5Z"/><path d="M8 11h8M8 14.5h5"/></svg><span>Forum</span></button>
+        <button class="active" data-page="market"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9h18l-1.5 11h-15L3 9Z"/><path d="M3 9l2-5h14l2 5M9 9l1 11M15 9l-1 11"/></svg><span>Marketplace</span></button>
+        <button data-page="flow"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="19" r="2"/><path d="M8 5h4a4 4 0 0 1 4 4v2a4 4 0 0 0 4 4M6 7v9a3 3 0 0 0 3 3h7"/></svg><span>Alur</span></button>
       </nav>
       <div class="top-actions"><button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" aria-label="Aktifkan mode gelap"><span aria-hidden="true">☾</span> Mode gelap</button><span class="location">⌖ Semarang</span><span class="avatar" title="Profil">R</span></div>
     </header>
