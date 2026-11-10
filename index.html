@@ -154,6 +154,82 @@
     .toast { position: fixed; z-index: 12; left: 50%; bottom: 22px; transform: translate(-50%, 20px); opacity: 0; padding: 11px 16px; border-radius: 9px; color: white; background: var(--green-dark); font-size: 12px; transition: .2s; pointer-events: none; }
     .toast.show { transform: translate(-50%, 0); opacity: 1; }
     .footer-note { margin: 20px 0 0; color: #a0a9a2; text-align: center; font-size: 10px; }
+    .theme-toggle { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; color: #526057; background: var(--paper); font-size: 11px; font-weight: 650; white-space: nowrap; }
+    .theme-toggle:hover { border-color: #b7cbb9; color: var(--green); }
+    body[data-theme="dark"] {
+      color-scheme: dark;
+      --ink: #e6eee8;
+      --muted: #a0ada4;
+      --line: #33463a;
+      --paper: #1d2922;
+      --canvas: #131b16;
+      --green: #8dbb98;
+      --green-dark: #163d2b;
+      --green-soft: #263b2d;
+      --lime: #d7ed9b;
+      --sand: #392f20;
+      --orange: #e0ad72;
+      --shadow: 0 8px 26px rgb(0 0 0 / 16%);
+    }
+    body[data-theme="dark"] .nav button { color: #aab7ad; }
+    body[data-theme="dark"] .location,
+    body[data-theme="dark"] .theme-toggle,
+    body[data-theme="dark"] .sort-select,
+    body[data-theme="dark"] .filter-control,
+    body[data-theme="dark"] .button-secondary { color: #d0dbd2; background: #202e25; }
+    body[data-theme="dark"] .theme-toggle:hover { color: var(--green); }
+    body[data-theme="dark"] .side-title,
+    body[data-theme="dark"] .time,
+    body[data-theme="dark"] .topic-count,
+    body[data-theme="dark"] .section-label,
+    body[data-theme="dark"] .footer-note { color: #9aa89e; }
+    body[data-theme="dark"] .side-link,
+    body[data-theme="dark"] .person,
+    body[data-theme="dark"] .topic,
+    body[data-theme="dark"] .clear-button { color: #c0ccc3; }
+    body[data-theme="dark"] .side-link span:last-child { color: #9aa89e; }
+    body[data-theme="dark"] .button-secondary { border-color: var(--line); }
+    body[data-theme="dark"] .tabs { background: #202a23; }
+    body[data-theme="dark"] .tabs button { color: #aab7ad; }
+    body[data-theme="dark"] .tabs button.active { color: #e4eee6; background: #34443a; }
+    body[data-theme="dark"] .searchbar,
+    body[data-theme="dark"] .searchbar input,
+    body[data-theme="dark"] .form-field input,
+    body[data-theme="dark"] .form-field textarea,
+    body[data-theme="dark"] .form-field select { color: var(--ink); background: #202e25; }
+    body[data-theme="dark"] .searchbar input::placeholder,
+    body[data-theme="dark"] .form-field input::placeholder,
+    body[data-theme="dark"] .form-field textarea::placeholder { color: #8e9c92; }
+    body[data-theme="dark"] .searchbar span { color: #9aa89e; }
+    body[data-theme="dark"] .feed-card p,
+    body[data-theme="dark"] .product-info p,
+    body[data-theme="dark"] .seller-line,
+    body[data-theme="dark"] .post-meta,
+    body[data-theme="dark"] .event p,
+    body[data-theme="dark"] .flow-card > p,
+    body[data-theme="dark"] .flow-step p,
+    body[data-theme="dark"] .tag-explain p,
+    body[data-theme="dark"] .modal-note { color: #a0ada4; }
+    body[data-theme="dark"] .tag { color: #bdc9bf; border-color: #3a4b3e; background: #253229; }
+    body[data-theme="dark"] .tag.green { color: #a9d2ad; border-color: #3a5940; background: #263b2d; }
+    body[data-theme="dark"] .tag.gold { color: #e0bc8d; border-color: #5a4831; background: #392f20; }
+    body[data-theme="dark"] .post-meta,
+    body[data-theme="dark"] .topic,
+    body[data-theme="dark"] .feed-card .post-meta { border-color: #334238; }
+    body[data-theme="dark"] .mini-avatar { color: #bdd9c0; background: #304337; }
+    body[data-theme="dark"] .avatar { color: #c0ddc4; background: #304337; }
+    body[data-theme="dark"] .badge { color: #b8d8bc; background: #304337; }
+    body[data-theme="dark"] .event { background: #392f20; }
+    body[data-theme="dark"] .tag-explain > div { border-color: #334238; }
+    body[data-theme="dark"] .callout,
+    body[data-theme="dark"] .flow-bridge { color: #bdd0c0; border-color: #3a5140; background: #202e25; }
+    body[data-theme="dark"] .flow-step:not(:last-child):before { background: #3a5140; }
+    body[data-theme="dark"] .empty-state { color: #a0ada4; border-color: #3a4b3e; }
+    body[data-theme="dark"] .modal { background: var(--paper); }
+    body[data-theme="dark"] .close-button { color: #c0ccc3; background: #304037; }
+    body[data-theme="dark"] .form-field label { color: #c0ccc3; }
+    body[data-theme="dark"] .product-visual { background: linear-gradient(145deg, #334838, #4a684e); }
+    body[data-theme="dark"] .condition-stamp { color: #253229; }
     @media (max-width: 1050px) {
       .layout { grid-template-columns: 190px minmax(0, 1fr); }
       .rightbar { display: none; }
@@ -167,6 +243,8 @@
       .nav button { padding: 0 8px; font-size: 11px; }
       .top-actions { gap: 7px; }
       .location { font-size: 10px; }
+      .theme-toggle { padding: 7px 8px; font-size: 0; }
+      .theme-toggle span { font-size: 15px; }
       .shell { padding: 19px 14px 40px; }
       .layout { grid-template-columns: 1fr; }
       .sidebar { display: none; }
@@ -191,15 +269,15 @@
         <span class="brand-mark">✳</span><span>Aquaku<small>komunitas aquascape</small></span>
       </a>
       <nav class="nav" aria-label="Navigasi utama">
-        <button class="active" data-page="forum">Forum</button>
-        <button data-page="market">Marketplace</button>
+        <button data-page="forum">Forum</button>
+        <button class="active" data-page="market">Marketplace</button>
         <button data-page="flow">Alur Pengguna</button>
       </nav>
-      <div class="top-actions"><span class="location">⌖ Semarang</span><span class="avatar" title="Profil">R</span></div>
+      <div class="top-actions"><button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" aria-label="Aktifkan mode gelap"><span aria-hidden="true">☾</span> Mode gelap</button><span class="location">⌖ Semarang</span><span class="avatar" title="Profil">R</span></div>
     </header>
 
     <main class="shell">
-      <section id="forum" class="page active">
+      <section id="forum" class="page">
         <div class="layout">
           <aside class="sidebar">
             <div class="panel sidebar-box">
@@ -252,7 +330,7 @@
         </div>
       </section>
 
-      <section id="market" class="page">
+      <section id="market" class="page active">
         <div class="layout">
           <aside class="sidebar">
             <div class="panel sidebar-box">
@@ -430,6 +508,18 @@
       document.querySelectorAll(".nav [data-page]").forEach((button) => button.classList.toggle("active", button.dataset.page === page));
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
+    const themeToggle = document.getElementById("theme-toggle");
+    function setTheme(theme) {
+      const isDark = theme === "dark";
+      document.body.dataset.theme = isDark ? "dark" : "light";
+      themeToggle.setAttribute("aria-pressed", String(isDark));
+      themeToggle.setAttribute("aria-label", isDark ? "Aktifkan mode terang" : "Aktifkan mode gelap");
+      themeToggle.innerHTML = `<span aria-hidden="true">${isDark ? "☀" : "☾"}</span> Mode ${isDark ? "terang" : "gelap"}`;
+      document.querySelector('meta[name="theme-color"]').content = isDark ? "#131b16" : "#f5f7f2";
+      localStorage.setItem("aquaku-theme", isDark ? "dark" : "light");
+    }
+    setTheme(localStorage.getItem("aquaku-theme") || "light");
+    themeToggle.addEventListener("click", () => setTheme(document.body.dataset.theme === "dark" ? "light" : "dark"));
     document.querySelectorAll(".nav [data-page], [data-page-link]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.page || button.dataset.pageLink)));
     document.querySelectorAll("[data-forum-filter]").forEach((button) => button.addEventListener("click", () => {
       activeForumCategory = button.dataset.forumFilter;
