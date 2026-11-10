@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7f2">
+  <title>Aquaku — Komunitas Aquascape Semarang</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d2b24;
+      --muted: #748078;
+      --line: #e6ebe4;
+      --paper: #fff;
+      --canvas: #f5f7f2;
+      --green: #245c43;
+      --green-dark: #193f2e;
+      --green-soft: #eaf3ec;
+      --lime: #d7ed9b;
+      --sand: #f8f2e6;
+      --orange: #a86632;
+      --shadow: 0 8px 26px rgb(34 55 42 / 5%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--canvas); font-size: 14px; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; }
+    .topbar {
+      height: 70px; padding: 0 max(28px, calc((100vw - 1320px) / 2));
+      display: flex; align-items: center; gap: 42px; background: var(--paper);
+      border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-size: 19px; font-weight: 780; letter-spacing: -.7px; }
+    .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 12px; color: white; background: var(--green); font-size: 19px; }
+    .brand small { display: block; color: var(--muted); font-size: 10px; font-weight: 550; letter-spacing: .1px; margin-top: 1px; }
+    .nav { display: flex; align-items: stretch; height: 100%; gap: 6px; }
+    .nav button { border: 0; background: transparent; padding: 0 15px; color: #647068; font-weight: 620; border-bottom: 2px solid transparent; }
+    .nav button.active { color: var(--green); border-bottom-color: var(--green); }
+    .top-actions { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+    .location { color: #49564e; font-size: 12px; font-weight: 620; }
+    .avatar { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: #e4eee5; color: var(--green); font-weight: 750; }
+    .shell { max-width: 1320px; margin: auto; padding: 27px 28px 60px; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr) 254px; gap: 23px; align-items: start; }
+    .sidebar, .rightbar { display: grid; gap: 15px; }
+    .panel, .card, .feed-card { background: var(--paper); border: 1px solid var(--line); border-radius: 15px; box-shadow: var(--shadow); }
+    .sidebar-box { padding: 18px 16px; }
+    .side-title { margin: 0 0 14px; color: #8a948d; text-transform: uppercase; font-size: 10px; letter-spacing: 1px; font-weight: 760; }
+    .side-link { width: 100%; padding: 9px 10px; border: 0; background: transparent; border-radius: 9px; display: flex; justify-content: space-between; color: #58635c; text-align: left; font-size: 13px; }
+    .side-link.active, .side-link:hover { color: var(--green); background: var(--green-soft); font-weight: 650; }
+    .side-link span:last-child { color: #a3aba5; font-size: 11px; }
+    .upgrade-card { padding: 17px; background: var(--green-dark); color: white; overflow: hidden; position: relative; }
+    .upgrade-card:after { content: ""; width: 110px; height: 110px; position: absolute; right: -40px; top: -45px; border-radius: 50%; background: rgb(215 237 155 / 13%); }
+    .upgrade-card p { margin: 7px 0 14px; color: #d5e0d8; font-size: 12px; line-height: 1.55; }
+    .upgrade-card strong { font-size: 14px; }
+    .upgrade-card button { padding: 8px 11px; border: 0; border-radius: 8px; background: var(--lime); color: var(--green-dark); font-size: 11px; font-weight: 720; }
+    .content { min-width: 0; }
+    .welcome { display: flex; justify-content: space-between; align-items: end; gap: 18px; margin: 2px 0 20px; }
+    .eyebrow { color: var(--green); font-size: 11px; font-weight: 750; letter-spacing: .8px; text-transform: uppercase; }
+    h1 { margin: 5px 0 6px; font-size: clamp(24px, 3vw, 31px); letter-spacing: -1.1px; line-height: 1.12; }
+    .subtitle { margin: 0; color: var(--muted); font-size: 13px; }
+    .button-primary, .button-secondary { border-radius: 9px; padding: 10px 14px; font-weight: 680; font-size: 12px; white-space: nowrap; }
+    .button-primary { border: 1px solid var(--green); color: white; background: var(--green); }
+    .button-primary:hover { background: var(--green-dark); }
+    .button-secondary { border: 1px solid var(--line); color: #455149; background: white; }
+    .tab-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0 13px; }
+    .tabs { display: flex; gap: 6px; padding: 4px; background: #ecefea; border-radius: 10px; }
+    .tabs button { border: 0; border-radius: 7px; background: transparent; padding: 8px 12px; color: #69756d; font-size: 12px; font-weight: 650; }
+    .tabs button.active { color: var(--green-dark); background: white; box-shadow: 0 1px 5px rgb(28 48 36 / 9%); }
+    .sort-select, .filter-control { border: 1px solid var(--line); border-radius: 8px; color: #526057; background: white; padding: 9px 10px; font-size: 11px; }
+    .searchbar { display: flex; align-items: center; gap: 9px; height: 43px; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; background: white; }
+    .searchbar span { color: #859089; font-size: 17px; }
+    .searchbar input { flex: 1; min-width: 0; border: 0; outline: 0; color: var(--ink); font-size: 12px; }
+    .filter-strip { margin: 11px 0 15px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .filter-control { padding: 8px 9px; }
+    .clear-button { border: 0; background: none; color: var(--green); font-size: 11px; font-weight: 670; }
+    .section-label { margin: 19px 0 10px; display: flex; justify-content: space-between; align-items: baseline; color: #79847d; font-size: 11px; }
+    .section-label strong { color: var(--ink); font-size: 13px; }
+    .feed { display: grid; gap: 11px; }
+    .feed-card { padding: 16px 17px; cursor: pointer; transition: border-color .15s, transform .15s; }
+    .feed-card:hover { border-color: #b7cbb9; transform: translateY(-1px); }
+    .post-top { display: flex; align-items: center; gap: 9px; }
+    .mini-avatar { width: 31px; height: 31px; flex: 0 0 31px; border-radius: 50%; background: #edf2e8; display: grid; place-items: center; color: var(--green); font-size: 12px; font-weight: 750; }
+    .person { color: #38443c; font-size: 11px; font-weight: 690; }
+    .time { margin-top: 3px; color: #929b94; font-size: 10px; }
+    .badge { display: inline-flex; align-items: center; border-radius: 30px; padding: 4px 7px; color: var(--green); background: var(--green-soft); font-size: 9px; font-weight: 730; }
+    .feed-card h3 { margin: 13px 0 6px; font-size: 15px; letter-spacing: -.25px; line-height: 1.4; }
+    .feed-card p { margin: 0; color: #768178; font-size: 12px; line-height: 1.65; }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .tag { display: inline-flex; align-items: center; border: 1px solid #e8ece7; border-radius: 20px; padding: 5px 8px; color: #69756d; background: #fbfcfa; font-size: 10px; font-weight: 590; }
+    .tag.green { color: #34664a; border-color: #dceade; background: #f0f7ef; }
+    .tag.gold { color: #94612e; border-color: #f0e2c6; background: #fbf5e9; }
+    .post-meta { display: flex; gap: 15px; margin-top: 14px; padding-top: 11px; border-top: 1px solid #f0f2ef; color: #8b958e; font-size: 10px; }
+    .right-box { padding: 17px; }
+    .right-box h3 { margin: 0 0 13px; font-size: 13px; }
+    .topic { display: flex; gap: 8px; align-items: center; padding: 9px 0; border-top: 1px solid #f0f2ef; color: #57635b; font-size: 11px; }
+    .topic:first-of-type { border-top: 0; }
+    .topic-count { margin-left: auto; color: #a0a9a2; font-size: 10px; }
+    .event { background: var(--sand); padding: 13px; border-radius: 10px; }
+    .event small { color: var(--orange); font-size: 9px; font-weight: 750; text-transform: uppercase; letter-spacing: .6px; }
+    .event strong { display: block; margin: 6px 0 5px; font-size: 12px; }
+    .event p { margin: 0; color: #817765; font-size: 10px; line-height: 1.5; }
+    .listing-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+    .product-card { overflow: hidden; cursor: pointer; }
+    .product-visual { position: relative; height: 137px; display: grid; place-items: center; overflow: hidden; background: linear-gradient(145deg, #dce9d9, #aec8ac); }
+    .product-visual:before, .product-visual:after { content: ""; position: absolute; border-radius: 50%; background: rgb(255 255 255 / 27%); }
+    .product-visual:before { width: 145px; height: 145px; top: -75px; right: -25px; }
+    .product-visual:after { width: 95px; height: 95px; bottom: -65px; left: 15px; }
+    .product-emoji { font-size: 55px; filter: drop-shadow(0 7px 5px rgb(31 55 36 / 14%)); }
+    .condition-stamp { position: absolute; z-index: 1; left: 10px; top: 10px; padding: 5px 8px; border-radius: 20px; background: white; color: #45534a; font-size: 9px; font-weight: 730; }
+    .location-stamp { position: absolute; z-index: 1; right: 9px; bottom: 9px; padding: 5px 7px; border-radius: 7px; color: white; background: rgb(25 63 46 / 82%); font-size: 9px; }
+    .product-info { padding: 13px; }
+    .product-info h3 { margin: 9px 0 5px; font-size: 13px; line-height: 1.4; }
+    .product-info p { margin: 0; color: #7c877f; font-size: 10px; }
+    .price-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+    .price { color: var(--green-dark); font-size: 14px; font-weight: 790; }
+    .seller-line { display: flex; gap: 5px; align-items: center; margin-top: 10px; color: #849087; font-size: 10px; }
+    .flow-intro { margin-bottom: 22px; }
+    .flow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .flow-card { padding: 21px; }
+    .flow-card h2 { margin: 0 0 5px; font-size: 17px; }
+    .flow-card > p { margin: 0 0 19px; color: var(--muted); font-size: 12px; }
+    .flow-list { display: grid; gap: 0; }
+    .flow-step { display: grid; grid-template-columns: 31px 1fr; gap: 12px; position: relative; padding-bottom: 19px; }
+    .flow-step:not(:last-child):before { content: ""; width: 1px; position: absolute; left: 15px; top: 31px; bottom: 2px; background: #dce5dc; }
+    .step-number { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 50%; color: var(--green); background: var(--green-soft); font-size: 11px; font-weight: 750; }
+    .flow-step strong { display: block; margin: 2px 0 4px; font-size: 12px; }
+    .flow-step p { margin: 0; color: #7e8981; font-size: 11px; line-height: 1.5; }
+    .callout { margin-top: 15px; padding: 12px; border-radius: 9px; background: #f6f8f4; color: #67736a; font-size: 10px; line-height: 1.6; }
+    .flow-bridge { margin: 17px 0; padding: 14px 18px; text-align: center; border: 1px dashed #cbd9cb; border-radius: 11px; background: #f2f7f1; color: var(--green); font-size: 12px; font-weight: 700; }
+    .tag-guide { margin-top: 22px; padding: 20px; }
+    .tag-guide h2 { margin: 0 0 6px; font-size: 16px; }
+    .tag-guide > p { margin: 0 0 14px; color: var(--muted); font-size: 11px; }
+    .tag-explain { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+    .tag-explain > div { padding: 11px; border: 1px solid #edf0ec; border-radius: 9px; }
+    .tag-explain p { margin: 7px 0 0; color: #849087; font-size: 10px; line-height: 1.5; }
+    .empty-state { padding: 35px 20px; text-align: center; border: 1px dashed #dce4dc; border-radius: 12px; color: var(--muted); font-size: 12px; }
+    .modal-backdrop { display: none; position: fixed; inset: 0; z-index: 10; padding: 18px; place-items: center; background: rgb(21 34 26 / 48%); }
+    .modal-backdrop.open { display: grid; }
+    .modal { width: min(520px, 100%); max-height: 90vh; overflow: auto; padding: 22px; border-radius: 16px; background: white; box-shadow: 0 22px 70px rgb(0 0 0 / 20%); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .modal-header h2 { margin: 0; font-size: 18px; }
+    .close-button { width: 31px; height: 31px; border: 0; border-radius: 50%; color: #667168; background: #f1f3f0; font-size: 17px; }
+    .modal-note { color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .form-field { display: grid; gap: 6px; margin: 14px 0; }
+    .form-field label { color: #4a574e; font-size: 11px; font-weight: 680; }
+    .form-field input, .form-field textarea, .form-field select { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 10px; outline-color: #99b99c; color: var(--ink); background: white; font-size: 12px; }
+    .form-field textarea { min-height: 90px; resize: vertical; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
+    .toast { position: fixed; z-index: 12; left: 50%; bottom: 22px; transform: translate(-50%, 20px); opacity: 0; padding: 11px 16px; border-radius: 9px; color: white; background: var(--green-dark); font-size: 12px; transition: .2s; pointer-events: none; }
+    .toast.show { transform: translate(-50%, 0); opacity: 1; }
+    .footer-note { margin: 20px 0 0; color: #a0a9a2; text-align: center; font-size: 10px; }
+    @media (max-width: 1050px) {
+      .layout { grid-template-columns: 190px minmax(0, 1fr); }
+      .rightbar { display: none; }
+      .topbar { gap: 24px; }
+    }
+    @media (max-width: 700px) {
+      .topbar { height: auto; min-height: 61px; padding: 0 15px; gap: 10px; flex-wrap: wrap; }
+      .brand { font-size: 16px; }
+      .brand-mark { width: 30px; height: 30px; }
+      .nav { order: 3; width: 100%; height: 43px; justify-content: space-around; }
+      .nav button { padding: 0 8px; font-size: 11px; }
+      .top-actions { gap: 7px; }
+      .location { font-size: 10px; }
+      .shell { padding: 19px 14px 40px; }
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .welcome { align-items: flex-start; }
+      .welcome .button-primary { padding: 9px 10px; font-size: 10px; }
+      .listing-grid { gap: 9px; }
+      .product-visual { height: 110px; }
+      .product-info { padding: 10px; }
+      .product-info h3 { font-size: 12px; }
+      .flow-grid { grid-template-columns: 1fr; }
+      .tag-explain { grid-template-columns: 1fr 1fr; }
+      .tab-row { align-items: flex-start; }
+      .tabs button { padding: 8px 9px; font-size: 11px; }
+      .sort-select { max-width: 125px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Rimbun, beranda">
+        <span class="brand-mark">✳</span><span>Aquaku<small>komunitas aquascape</small></span>
+      </a>
+      <nav class="nav" aria-label="Navigasi utama">
+        <button class="active" data-page="forum">Forum</button>
+        <button data-page="market">Marketplace</button>
+        <button data-page="flow">Alur Pengguna</button>
+      </nav>
+      <div class="top-actions"><span class="location">⌖ Semarang</span><span class="avatar" title="Profil">R</span></div>
+    </header>
+
+    <main class="shell">
+      <section id="forum" class="page active">
+        <div class="layout">
+          <aside class="sidebar">
+            <div class="panel sidebar-box">
+              <p class="side-title">Jelajahi forum</p>
+              <button class="side-link active" data-forum-filter="Semua diskusi"><span>◉ &nbsp;Semua diskusi</span><span>24</span></button>
+              <button class="side-link" data-forum-filter="Tanya jawab"><span>❔ &nbsp;Tanya jawab</span><span>12</span></button>
+              <button class="side-link" data-forum-filter="Showcase tank"><span>▧ &nbsp;Showcase tank</span><span>8</span></button>
+              <button class="side-link" data-forum-filter="Jual / tukar"><span>↔ &nbsp;Jual / tukar</span><span>4</span></button>
+            </div>
+            <div class="panel sidebar-box">
+              <p class="side-title">Topik populer</p>
+              <button class="side-link" data-search-tag="algae"># algae</button>
+              <button class="side-link" data-search-tag="tanaman"># tanaman</button>
+              <button class="side-link" data-search-tag="CO2"># CO2</button>
+              <button class="side-link" data-search-tag="pemula"># pemula</button>
+            </div>
+            <div class="panel upgrade-card">
+              <strong>Lapak tumbuh bersama</strong>
+              <p>Mulai jual trimmingan gratis. Upgrade saat tokomu berkembang.</p>
+              <button data-open-modal="listing">Buat listing →</button>
+            </div>
+          </aside>
+
+          <div class="content">
+            <div class="welcome">
+              <div><div class="eyebrow">Ruang tumbuh hobi</div><h1>Halo, aquascaper 👋</h1><p class="subtitle">Ngobrol, belajar, dan temukan teman satu hobi di Semarang.</p></div>
+              <button class="button-primary" data-open-modal="post">＋ Buat diskusi</button>
+            </div>
+            <div class="searchbar"><span>⌕</span><input id="forum-search" type="search" placeholder="Cari diskusi, tanaman, atau masalah..."><span>⌘ K</span></div>
+            <div class="tab-row"><div class="tabs" role="tablist">
+              <button class="active" data-forum-tab="Terbaru">Terbaru</button><button data-forum-tab="Belum terjawab">Belum terjawab</button><button data-forum-tab="Populer">Populer</button>
+            </div><button class="button-secondary" data-page-link="flow">Lihat userflow</button></div>
+            <div id="forum-feed" class="feed"></div>
+            <div id="forum-empty" class="empty-state" hidden>Tidak ada diskusi yang cocok. Coba ubah kata kunci atau kategori.</div>
+          </div>
+
+          <aside class="rightbar">
+            <div class="panel right-box">
+              <h3>Diskusi ramai 🔥</h3>
+              <div class="topic"><span>🪴</span><span>Tips carpet plant untuk pemula</span><span class="topic-count">28</span></div>
+              <div class="topic"><span>💧</span><span>Algae muncul setelah dosing</span><span class="topic-count">16</span></div>
+              <div class="topic"><span>🐟</span><span>Rekomendasi fauna nano tank</span><span class="topic-count">12</span></div>
+            </div>
+            <div class="panel right-box">
+              <h3>Agenda komunitas</h3>
+              <div class="event"><small>Meetup · Semarang</small><strong>Ngopi & tukar tanaman</strong><p>Minggu, 16 Nov · Taman Indonesia Kaya<br>Terbuka untuk semua level</p></div>
+            </div>
+            <div class="panel right-box"><h3>Mulai dari sini</h3><div class="topic">📖 &nbsp;Panduan aquascape pemula</div><div class="topic">🧪 &nbsp;Isi parameter air</div><div class="topic">🪴 &nbsp;Buat tank profile</div></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="market" class="page">
+        <div class="layout">
+          <aside class="sidebar">
+            <div class="panel sidebar-box">
+              <p class="side-title">Kategori</p>
+              <button class="side-link active" data-market-category="Semua kategori"><span>◉ &nbsp;Semua kategori</span><span>48</span></button>
+              <button class="side-link" data-market-category="Tanaman"><span>🪴 &nbsp;Tanaman</span></button>
+              <button class="side-link" data-market-category="Fauna"><span>🐟 &nbsp;Fauna</span></button>
+              <button class="side-link" data-market-category="Peralatan"><span>⚙ &nbsp;Peralatan</span></button>
+              <button class="side-link" data-market-category="Hardscape"><span>🪨 &nbsp;Hardscape</span></button>
+            </div>
+            <div class="panel sidebar-box">
+              <p class="side-title">Kondisi barang</p>
+              <button class="side-link" data-condition="BNIB">BNIB <span>Toko</span></button>
+              <button class="side-link" data-condition="New">New <span>Toko</span></button>
+              <button class="side-link" data-condition="Like New">Like New</button>
+              <button class="side-link" data-condition="Second (Good)">Second (Good)</button>
+              <button class="side-link" data-condition="Second (Fair)">Second (Fair)</button>
+            </div>
+            <div class="panel sidebar-box">
+              <p class="side-title">Cara menerima</p>
+              <button class="side-link" data-delivery="COD Semarang">☑ &nbsp;COD Semarang</button>
+              <button class="side-link" data-delivery="Siap kirim hari ini">☑ &nbsp;Siap kirim hari ini</button>
+              <button class="side-link" data-delivery="Meetup saja">☑ &nbsp;Meetup saja</button>
+              <button class="side-link" data-delivery="Garansi live arrival">☑ &nbsp;Garansi live arrival</button>
+            </div>
+          </aside>
+          <div class="content">
+            <div class="welcome">
+              <div><div class="eyebrow">Jual beli lokal, tumbuh bareng</div><h1>Temukan isi tank-mu</h1><p class="subtitle">Barang hobi pilihan dari aquascaper dan toko sekitar Semarang.</p></div>
+              <button class="button-primary" data-open-modal="listing">＋ Pasang listing</button>
+            </div>
+            <div class="searchbar"><span>⌕</span><input id="market-search" type="search" placeholder="Cari tanaman, alat, atau toko..."><span>Semarang</span></div>
+            <div class="filter-strip">
+              <select id="category-filter" class="filter-control" aria-label="Kategori"><option value="">Semua kategori</option><option>Tanaman</option><option>Fauna</option><option>Peralatan</option><option>Hardscape</option></select>
+              <select id="condition-filter" class="filter-control" aria-label="Kondisi"><option value="">Semua kondisi</option><option>BNIB</option><option>New</option><option>Like New</option><option>Second (Good)</option><option>Second (Fair)</option></select>
+              <select id="delivery-filter" class="filter-control" aria-label="Pengiriman"><option value="">Semua opsi kirim</option><option>COD Semarang</option><option>Siap kirim hari ini</option><option>Meetup saja</option><option>Garansi live arrival</option></select>
+              <select id="price-sort" class="filter-control" aria-label="Urutkan harga"><option value="">Urutkan</option><option value="low">Harga terendah</option><option value="high">Harga tertinggi</option></select>
+              <button id="clear-filters" class="clear-button">Reset filter</button>
+            </div>
+            <div class="section-label"><strong id="listing-count">Pilihan untukmu</strong><span>Semua harga langsung ke penjual</span></div>
+            <div id="listing-grid" class="listing-grid"></div>
+            <div id="market-empty" class="empty-state" hidden>Belum ada listing yang cocok. Coba reset filter atau kata kunci.</div>
+            <p class="footer-note">Listing demo untuk wireframe · pastikan kondisi barang dan metode pengiriman sebelum bertransaksi.</p>
+          </div>
+          <aside class="rightbar">
+            <div class="panel right-box">
+              <h3>Standar listing Rimbun</h3>
+              <div class="topic">📷 &nbsp;Foto sesuai kondisi barang</div>
+              <div class="topic">🪴 &nbsp;Produk hidup: pilih status stok</div>
+              <div class="topic">📍 &nbsp;Utamakan COD atau meetup</div>
+              <div class="topic">🛡 &nbsp;Laporkan tag yang tidak sesuai</div>
+            </div>
+            <div class="panel right-box"><h3>Slot listing Personal</h3><div class="event"><small>Akun Personal</small><strong>3 dari 5 slot aktif</strong><p>Listing aktif tayang maksimal 30 hari. Slot kembali setelah listing terjual atau kedaluwarsa.</p></div></div>
+            <div class="panel right-box"><h3>Tag kondisi</h3><div class="tag-row"><span class="tag">BNIB</span><span class="tag">New</span><span class="tag">Like New</span><span class="tag">Second (Good)</span><span class="tag">Second (Fair)</span><span class="tag">Rusak / Spare part</span></div></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="flow" class="page">
+        <div class="flow-intro"><div class="eyebrow">Rancangan pengalaman</div><h1>Dari penasaran sampai jadi bagian komunitas</h1><p class="subtitle">Userflow MVP untuk pembeli dan penjual. Forum tetap gratis; membership penjual membuka kapasitas jual yang lebih besar.</p></div>
+        <div class="flow-grid">
+          <article class="panel flow-card">
+            <h2>🪴 Alur pembeli / hobiis</h2><p>Belajar, menemukan produk lokal, dan terhubung dengan komunitas.</p>
+            <div class="flow-list">
+              <div class="flow-step"><span class="step-number">1</span><div><strong>Masuk sebagai tamu atau buat akun</strong><p>Jelajahi diskusi dan listing publik. Verifikasi nomor HP saat ingin berinteraksi atau transaksi.</p></div></div>
+              <div class="flow-step"><span class="step-number">2</span><div><strong>Pilih kebutuhan</strong><p>Buka Forum untuk tanya perawatan, Showcase untuk inspirasi, atau Marketplace untuk cari barang.</p></div></div>
+              <div class="flow-step"><span class="step-number">3</span><div><strong>Cari & persempit hasil</strong><p>Gunakan kategori, kondisi, status stok, lokasi Semarang, COD, meetup, atau garansi live arrival.</p></div></div>
+              <div class="flow-step"><span class="step-number">4</span><div><strong>Periksa listing dan reputasi</strong><p>Cek foto, deskripsi kondisi, profil penjual, serta opsi pengiriman sebelum menghubungi penjual.</p></div></div>
+              <div class="flow-step"><span class="step-number">5</span><div><strong>Hubungi penjual & sepakati pengambilan</strong><p>Atur COD, meetup, atau kurir instan. Konfirmasi kondisi barang saat serah terima.</p></div></div>
+              <div class="flow-step"><span class="step-number">6</span><div><strong>Bagikan pengalaman</strong><p>Beri ulasan, laporkan tag yang tidak sesuai, atau bagikan hasilnya ke forum dan tank profile.</p></div></div>
+            </div>
+            <div class="callout"><strong>Titik kepercayaan:</strong> tag kondisi terstandar + foto wajib (minimal 3 untuk Like New/Second) + reputasi dan fitur lapor.</div>
+          </article>
+          <article class="panel flow-card">
+            <h2>🏪 Alur penjual</h2><p>Mulai dari listing Personal gratis, upgrade jika kebutuhan usaha bertambah.</p>
+            <div class="flow-list">
+              <div class="flow-step"><span class="step-number">1</span><div><strong>Buat akun & verifikasi nomor HP</strong><p>Akun Personal dapat ikut forum dan memasang listing sesuai aturan barang yang diperbolehkan.</p></div></div>
+              <div class="flow-step"><span class="step-number">2</span><div><strong>Pilih kategori dan tipe barang</strong><p>Tanaman, fauna, peralatan, atau hardscape. Tandai produk hidup, status siap kirim, atau pre-order.</p></div></div>
+              <div class="flow-step"><span class="step-number">3</span><div><strong>Isi listing dengan tag standar</strong><p>Foto, kondisi, harga, lokasi, stok, COD/meetup, nego/barter, dan garansi live arrival bila memenuhi syarat.</p></div></div>
+              <div class="flow-step"><span class="step-number">4</span><div><strong>Validasi aturan & kuota</strong><p>Personal: maks. 5 aktif, tayang 30 hari. BNIB/New hanya untuk Toko/Advance terverifikasi.</p></div></div>
+              <div class="flow-step"><span class="step-number">5</span><div><strong>Terbitkan dan tanggapi pembeli</strong><p>Listing tampil di hasil lokal. Penjual dan pembeli atur pembayaran serta penyerahan langsung.</p></div></div>
+              <div class="flow-step"><span class="step-number">6</span><div><strong>Tandai terjual / kelola kapasitas</strong><p>Slot Personal kembali setelah terjual/kedaluwarsa. Upgrade Toko atau beli add-on saat perlu slot tambahan.</p></div></div>
+            </div>
+            <div class="callout"><strong>Kontrol platform:</strong> batasi kuota per tier, cooldown Personal 7 hari saat kuota penuh, verifikasi toko, dan moderasi laporan.</div>
+          </article>
+        </div>
+        <div class="flow-bridge">Forum komunitas ↔ Marketplace lokal ↔ Meetup Semarang &nbsp;·&nbsp; pengalaman terhubung, transaksi tetap langsung dengan penjual</div>
+        <article class="panel tag-guide">
+          <h2>Sistem tag listing & filter pembeli</h2><p>Gunakan tag sebagai informasi standar, bukan pengganti foto dan deskripsi.</p>
+          <div class="tag-explain">
+            <div><span class="tag">BNIB / New</span><p>Barang baru. Khusus penjual Toko/Advance yang terverifikasi.</p></div>
+            <div><span class="tag">Like New</span><p>Bekas, kondisi nyaris mulus. Wajib foto aktual yang jelas.</p></div>
+            <div><span class="tag">Second (Good)</span><p>Bekas dan berfungsi normal; jelaskan kelengkapan barang.</p></div>
+            <div><span class="tag">Second (Fair)</span><p>Memiliki kekurangan; tuliskan minus dan sertakan minimal 3 foto.</p></div>
+            <div><span class="tag green">Trimmingan · TC</span><p>Penanda produk hidup; pilih trimmingan, bibit/rimpang, atau tissue culture.</p></div>
+            <div><span class="tag gold">COD · Live arrival</span><p>Opsi serah-terima dan garansi. Garansi hanya untuk toko terverifikasi.</p></div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div id="modal-backdrop" class="modal-backdrop" role="presentation">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-header"><h2 id="modal-title">Buat diskusi</h2><button class="close-button" id="close-modal" aria-label="Tutup">×</button></div>
+      <p class="modal-note" id="modal-note">Bagikan pertanyaan atau pengalamanmu ke komunitas aquascape Semarang.</p>
+      <form id="composer-form">
+        <div id="composer-fields"></div>
+        <div class="modal-actions"><button type="button" class="button-secondary" id="cancel-modal">Batal</button><button class="button-primary" type="submit">Terbitkan</button></div>
+      </form>
+    </section>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+
+  <script>
+    const discussions = [
+      { category: "Tanya jawab", title: "Daun Monte Carlo mulai menguning setelah pindah tank, normal atau kurang nutrisi?", body: "Baru setup ulang 2 minggu. CO₂ sudah jalan 8 jam, lampu 6 jam sehari. Ada yang pernah mengalami hal serupa?", author: "Nadia P.", initials: "NP", time: "12 menit lalu", tags: ["pemula", "tanaman", "CO₂"], comments: 8, views: 126, unanswered: false },
+      { category: "Troubleshooting", title: "Minta bantu identifikasi algae hijau di kaca dan hardscape", body: "Parameter: tank 60 cm, lampu 7 jam, NO₃ sekitar 10 ppm. Foto kondisi tank sudah saya lampirkan di diskusi.", author: "Dimas Aquatic", initials: "DA", time: "36 menit lalu", tags: ["algae", "troubleshooting"], comments: 0, views: 54, unanswered: true },
+      { category: "Showcase tank", title: "Nano tank 30 cm pertama — masukan untuk layout batu kali?", body: "Sudah berjalan 3 bulan dan mulai ditumbuhi monte carlo. Masih belajar mengatur perspektif dan komposisi.", author: "Rani W.", initials: "RW", time: "1 jam lalu", tags: ["showcase", "pemula"], comments: 14, views: 203, unanswered: false },
+      { category: "Jual / tukar", title: "Ada yang mau tukar trimmingan rotala dengan anubias nana?", body: "Lokasi Tembalang. Bisa meetup akhir pekan, stok cukup untuk beberapa porsi kecil.", author: "Banyu Tank", initials: "BT", time: "2 jam lalu", tags: ["tukar", "tanaman", "Semarang"], comments: 5, views: 91, unanswered: false }
+    ];
+    const listings = [
+      { title: "Anubias Nana Petite — 3 rumpun sehat", category: "Tanaman", condition: "Like New", price: 35000, visual: "🌿", seller: "Kebun Air Nara", verified: true, location: "Banyumanik", tags: ["COD Semarang", "Siap kirim hari ini", "Nego"], date: "15 menit lalu" },
+      { title: "Chihiros A-Series 45 cm, lengkap dus", category: "Peralatan", condition: "Second (Good)", price: 285000, visual: "💡", seller: "Rizky Aquascape", verified: false, location: "Tembalang", tags: ["COD Semarang", "Lengkap dus & nota"], date: "42 menit lalu" },
+      { title: "Trimmingan Monte Carlo, 5 cup", category: "Tanaman", condition: "Second (Good)", price: 20000, visual: "🍀", seller: "Kebun Air Nara", verified: true, location: "Banyumanik", tags: ["Siap kirim hari ini", "COD Semarang"], date: "1 jam lalu" },
+      { title: "Batu Seiryu mix untuk nano tank · 2 kg", category: "Hardscape", condition: "Second (Fair)", price: 45000, visual: "🪨", seller: "Dimas Aquatic", verified: false, location: "Pedurungan", tags: ["Meetup saja", "Bisa barter"], date: "2 jam lalu" },
+      { title: "Moss Christmas fresh, porsi starter", category: "Tanaman", condition: "Like New", price: 25000, visual: "🌱", seller: "Toko Rimbun", verified: true, location: "Candisari", tags: ["Garansi live arrival", "COD Semarang"], date: "3 jam lalu" },
+      { title: "Filter gantung mini, fungsi normal", category: "Peralatan", condition: "Second (Good)", price: 65000, visual: "⚙️", seller: "Aqua Sudut Kota", verified: true, location: "Gajahmungkur", tags: ["COD Semarang", "Nego"], date: "Kemarin" },
+      { title: "Guppy Endler lokal · 5 ekor", category: "Fauna", condition: "Like New", price: 30000, visual: "🐟", seller: "Rizky Aquascape", verified: false, location: "Tembalang", tags: ["Meetup saja", "Siap kirim hari ini"], date: "Kemarin" },
+      { title: "Cryptocoryne wendtii green, 2 pot", category: "Tanaman", condition: "Second (Good)", price: 18000, visual: "🪴", seller: "Toko Rimbun", verified: true, location: "Candisari", tags: ["Garansi live arrival", "COD Semarang"], date: "Kemarin" }
+    ];
+    let activeForumCategory = "";
+    let activeForumTab = "Terbaru";
+    let newListings = [];
+    let newDiscussions = [];
+
+    const safeText = (value) => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+    const forumItems = () => [...newDiscussions, ...discussions];
+    function renderForum() {
+      const query = document.getElementById("forum-search").value.trim().toLowerCase();
+      let items = forumItems().filter((item) => (!activeForumCategory || activeForumCategory === "Semua diskusi" || item.category === activeForumCategory || (activeForumCategory === "Tanya jawab" && item.category === "Troubleshooting")) &&
+        (!query || `${item.title} ${item.body} ${item.tags.join(" ")}`.toLowerCase().includes(query)));
+      if (activeForumTab === "Belum terjawab") items = items.filter((item) => item.unanswered);
+      if (activeForumTab === "Populer") items = [...items].sort((a, b) => b.views - a.views);
+      document.getElementById("forum-feed").innerHTML = items.map((item) => `<article class="feed-card" tabindex="0" data-open-detail="${safeText(item.title)}">
+        <div class="post-top"><div class="mini-avatar">${safeText(item.initials)}</div><div><div class="person">${safeText(item.author)} &nbsp;<span class="badge">${safeText(item.category)}</span></div><div class="time">${safeText(item.time)} · Semarang</div></div></div>
+        <h3>${safeText(item.title)}</h3><p>${safeText(item.body)}</p>
+        <div class="tag-row">${item.tags.map((tag) => `<span class="tag"># ${safeText(tag)}</span>`).join("")}</div>
+        <div class="post-meta"><span>◉ ${item.comments} balasan</span><span>◉ ${item.views} dilihat</span><span>♡ Simpan</span></div>
+      </article>`).join("");
+      document.getElementById("forum-empty").hidden = items.length > 0;
+    }
+    function allListings() { return [...newListings, ...listings]; }
+    function renderListings() {
+      const query = document.getElementById("market-search").value.trim().toLowerCase();
+      const category = document.getElementById("category-filter").value;
+      const condition = document.getElementById("condition-filter").value;
+      const delivery = document.getElementById("delivery-filter").value;
+      let items = allListings().filter((item) => (!category || item.category === category) && (!condition || item.condition === condition) &&
+        (!delivery || item.tags.includes(delivery)) && (!query || `${item.title} ${item.category} ${item.seller} ${item.tags.join(" ")}`.toLowerCase().includes(query)));
+      const sort = document.getElementById("price-sort").value;
+      if (sort === "low") items = [...items].sort((a, b) => a.price - b.price);
+      if (sort === "high") items = [...items].sort((a, b) => b.price - a.price);
+      document.getElementById("listing-count").textContent = `${items.length} listing ditemukan`;
+      document.getElementById("listing-grid").innerHTML = items.map((item) => `<article class="card product-card" tabindex="0" data-open-detail="${safeText(item.title)}">
+        <div class="product-visual"><span class="condition-stamp">${safeText(item.condition)}</span><span class="product-emoji">${safeText(item.visual)}</span><span class="location-stamp">⌖ ${safeText(item.location)}</span></div>
+        <div class="product-info"><div class="tag-row" style="margin-top:0">${item.tags.slice(0, 2).map((tag) => `<span class="tag ${tag.includes("Garansi") ? "green" : ""}">${safeText(tag)}</span>`).join("")}</div>
+        <h3>${safeText(item.title)}</h3><p>${safeText(item.category)} · ${safeText(item.date)}</p><div class="price-row"><span class="price">Rp${Number(item.price).toLocaleString("id-ID")}</span><span style="color:#929b94;font-size:10px">♡ Simpan</span></div>
+        <div class="seller-line"><span class="mini-avatar" style="width:22px;height:22px;flex-basis:22px;font-size:9px">${safeText(item.seller.slice(0, 1))}</span>${safeText(item.seller)} ${item.verified ? '<span class="badge">✓ Terverifikasi</span>' : ""}</div></div>
+      </article>`).join("");
+      document.getElementById("market-empty").hidden = items.length > 0;
+    }
+    function showPage(page) {
+      document.querySelectorAll(".page").forEach((section) => section.classList.toggle("active", section.id === page));
+      document.querySelectorAll(".nav [data-page]").forEach((button) => button.classList.toggle("active", button.dataset.page === page));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    document.querySelectorAll(".nav [data-page], [data-page-link]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.page || button.dataset.pageLink)));
+    document.querySelectorAll("[data-forum-filter]").forEach((button) => button.addEventListener("click", () => {
+      activeForumCategory = button.dataset.forumFilter;
+      document.querySelectorAll("[data-forum-filter]").forEach((el) => el.classList.toggle("active", el === button));
+      showPage("forum"); renderForum();
+    }));
+    document.querySelectorAll("[data-forum-tab]").forEach((button) => button.addEventListener("click", () => {
+      activeForumTab = button.dataset.forumTab;
+      document.querySelectorAll("[data-forum-tab]").forEach((el) => el.classList.toggle("active", el === button)); renderForum();
+    }));
+    document.querySelectorAll("[data-search-tag]").forEach((button) => button.addEventListener("click", () => {
+      document.getElementById("forum-search").value = button.dataset.searchTag; renderForum();
+    }));
+    document.querySelectorAll("[data-market-category]").forEach((button) => button.addEventListener("click", () => {
+      document.getElementById("category-filter").value = button.dataset.marketCategory === "Semua kategori" ? "" : button.dataset.marketCategory;
+      document.querySelectorAll("[data-market-category]").forEach((el) => el.classList.toggle("active", el === button));
+      showPage("market"); renderListings();
+    }));
+    document.querySelectorAll("[data-condition]").forEach((button) => button.addEventListener("click", () => {
+      document.getElementById("condition-filter").value = button.dataset.condition; showPage("market"); renderListings();
+    }));
+    document.querySelectorAll("[data-delivery]").forEach((button) => button.addEventListener("click", () => {
+      document.getElementById("delivery-filter").value = button.dataset.delivery; showPage("market"); renderListings();
+    }));
+    ["forum-search"].forEach((id) => document.getElementById(id).addEventListener("input", renderForum));
+    ["market-search", "category-filter", "condition-filter", "delivery-filter", "price-sort"].forEach((id) => document.getElementById(id).addEventListener("input", renderListings));
+    document.getElementById("clear-filters").addEventListener("click", () => {
+      ["market-search", "category-filter", "condition-filter", "delivery-filter", "price-sort"].forEach((id) => { document.getElementById(id).value = ""; });
+      document.querySelectorAll("[data-market-category]").forEach((el) => el.classList.toggle("active", el.dataset.marketCategory === "Semua kategori")); renderListings();
+    });
+
+    const backdrop = document.getElementById("modal-backdrop");
+    const fields = document.getElementById("composer-fields");
+    let composerType = "post";
+    function openComposer(type) {
+      composerType = type;
+      const isListing = type === "listing";
+      document.getElementById("modal-title").textContent = isListing ? "Pasang listing" : "Buat diskusi";
+      document.getElementById("modal-note").textContent = isListing
+        ? "Akun demo Personal: BNIB/New hanya tersedia untuk Toko/Advance terverifikasi. Listing ini disimpan lokal di prototipe."
+        : "Bagikan pertanyaan atau pengalamanmu ke komunitas aquascape Semarang.";
+      fields.innerHTML = isListing
+        ? `<div class="form-field"><label for="item-title">Nama barang</label><input id="item-title" name="title" required maxlength="90" placeholder="Contoh: Anubias nana petite, 3 rumpun"></div>
+          <div class="form-field"><label for="item-category">Kategori</label><select id="item-category" name="category"><option>Tanaman</option><option>Fauna</option><option>Peralatan</option><option>Hardscape</option></select></div>
+          <div class="form-field"><label for="item-condition">Kondisi</label><select id="item-condition" name="condition"><option>Like New</option><option>Second (Good)</option><option>Second (Fair)</option><option disabled>BNIB — khusus Toko terverifikasi</option><option disabled>New — khusus Toko terverifikasi</option></select></div>
+          <div class="form-field"><label for="item-price">Harga (Rp)</label><input id="item-price" name="price" type="number" min="0" required placeholder="35000"></div>
+          <div class="form-field"><label for="item-location">Lokasi di Semarang</label><input id="item-location" name="location" required placeholder="Contoh: Tembalang"></div>
+          <div class="form-field"><label for="item-tags">Tag opsi kirim (pisahkan koma)</label><input id="item-tags" name="tags" placeholder="COD Semarang, Siap kirim hari ini"></div>`
+        : `<div class="form-field"><label for="post-category">Kategori diskusi</label><select id="post-category" name="category"><option>Tanya jawab</option><option>Showcase tank</option><option>Troubleshooting</option><option>Jual / tukar</option></select></div>
+          <div class="form-field"><label for="post-title">Judul diskusi</label><input id="post-title" name="title" required maxlength="100" placeholder="Apa yang ingin kamu diskusikan?"></div>
+          <div class="form-field"><label for="post-body">Ceritakan lebih detail</label><textarea id="post-body" name="body" required placeholder="Sertakan detail tank, parameter air, atau hal yang sudah dicoba..."></textarea></div>
+          <div class="form-field"><label for="post-tags">Tag topik (pisahkan koma)</label><input id="post-tags" name="tags" placeholder="pemula, tanaman"></div>`;
+      backdrop.classList.add("open");
+      setTimeout(() => fields.querySelector("input")?.focus(), 0);
+    }
+    document.querySelectorAll("[data-open-modal]").forEach((button) => button.addEventListener("click", () => openComposer(button.dataset.openModal)));
+    function closeComposer() { backdrop.classList.remove("open"); }
+    document.getElementById("close-modal").addEventListener("click", closeComposer);
+    document.getElementById("cancel-modal").addEventListener("click", closeComposer);
+    backdrop.addEventListener("click", (event) => { if (event.target === backdrop) closeComposer(); });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeComposer(); });
+    document.getElementById("composer-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+      if (composerType === "listing") {
+        const price = Number(data.price);
+        if (!Number.isFinite(price) || price < 0) return;
+        const tags = String(data.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean);
+        newListings.unshift({ title: data.title, category: data.category, condition: data.condition, price, visual: data.category === "Tanaman" ? "🌿" : data.category === "Fauna" ? "🐟" : data.category === "Hardscape" ? "🪨" : "⚙️", seller: "Kamu", verified: false, location: data.location, tags, date: "Baru saja" });
+        renderListings(); showPage("market"); notify("Listing tersimpan dalam prototipe.");
+      } else {
+        const tags = String(data.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean);
+        newDiscussions.unshift({ category: data.category, title: data.title, body: data.body, author: "Kamu", initials: "K", time: "Baru saja", tags, comments: 0, views: 1, unanswered: true });
+        activeForumCategory = ""; activeForumTab = "Terbaru";
+        document.querySelectorAll("[data-forum-filter]").forEach((el) => el.classList.toggle("active", el.dataset.forumFilter === "Semua diskusi"));
+        document.querySelectorAll("[data-forum-tab]").forEach((el) => el.classList.toggle("active", el.dataset.forumTab === "Terbaru"));
+        renderForum(); showPage("forum"); notify("Diskusi tersimpan dalam prototipe.");
+      }
+      closeComposer(); event.currentTarget.reset();
+    });
+    function notify(message) {
+      const toast = document.getElementById("toast"); toast.textContent = message; toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2600);
+    }
+    document.addEventListener("click", (event) => {
+      const card = event.target.closest("[data-open-detail]");
+      if (card) notify(`Tampilan detail "${card.dataset.openDetail}" dapat dikembangkan pada tahap berikutnya.`);
+    });
+    renderForum(); renderListings();
+  </script>
+</body>
+</html>
