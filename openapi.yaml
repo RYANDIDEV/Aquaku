@@ -1,0 +1,1082 @@
+openapi: 3.1.0
+info:
+  title: Aquaku Backend API
+  version: 0.5.0
+  description: REST API akun, marketplace, membership, transaksi, rating, dan moderasi Aquaku.
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Development
+security:
+  - bearerAuth: []
+paths:
+  /marketplace/regions:
+    get:
+      security: []
+      summary: Daftar kelurahan Kota Semarang
+      responses:
+        '200':
+          description: Daftar wilayah yang dapat dipakai pada listing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Region' }
+                required: [data]
+  /marketplace/taxonomy:
+    get:
+      security: []
+      summary: Daftar kategori dan tag kondisi
+      responses:
+        '200':
+          description: Taksonomi listing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      categories:
+                        type: array
+                        items: { $ref: '#/components/schemas/Category' }
+                      tags:
+                        type: array
+                        items: { $ref: '#/components/schemas/Tag' }
+                    required: [categories, tags]
+                required: [data]
+  /marketplace/listings:
+    get:
+      security: []
+      summary: Cari listing aktif
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: category, in: query, schema: { type: string, maxLength: 64 } }
+        - { name: condition, in: query, schema: { $ref: '#/components/schemas/Condition' } }
+        - { name: min_price, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: max_price, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: region_code, in: query, schema: { type: string, maxLength: 32 } }
+        - { name: district_code, in: query, schema: { type: string, maxLength: 16 } }
+        - { name: sort, in: query, schema: { type: string, enum: [newest, price_asc, price_desc], default: newest } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: Hasil pencarian
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListingPage' }
+    post:
+      summary: Buat listing aktif
+      description: Memerlukan access token, HP terverifikasi, slot kuota, dan foto terverifikasi.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateListing' }
+      responses:
+        '201': { description: Listing dibuat, content: { application/json: { schema: { $ref: '#/components/schemas/ListingResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/listings/{listingId}:
+    parameters:
+      - { $ref: '#/components/parameters/ListingId' }
+    get:
+      security: []
+      summary: Detail listing aktif
+      responses:
+        '200': { description: Detail listing, content: { application/json: { schema: { $ref: '#/components/schemas/ListingResponse' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      summary: Ubah listing aktif milik sendiri
+      description: photo_ids tidak melepas foto yang sudah terpasang. Hapus foto lama melalui DELETE /marketplace/media/{assetId} agar file Cloudinary ikut dihapus.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateListing' }
+      responses:
+        '200': { description: Listing diperbarui, content: { application/json: { schema: { $ref: '#/components/schemas/ListingResponse' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      summary: Soft delete listing aktif atau nonaktif milik sendiri
+      responses:
+        '200': { description: Listing diarsipkan }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /marketplace/listings/{listingId}/sold:
+    parameters:
+      - { $ref: '#/components/parameters/ListingId' }
+    post:
+      summary: Tandai listing terjual, opsional tautkan pembeli terverifikasi
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                buyer_id: { type: string, format: uuid, description: Jika kosong, penjualan tidak bisa diberi rating }
+      responses:
+        '201':
+          description: Listing ditandai terjual; jika buyer_id diberikan, menunggu konfirmasi pembeli
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MarkSoldResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /marketplace/listings/{listingId}/sale:
+    parameters:
+      - { $ref: '#/components/parameters/ListingId' }
+    post:
+      summary: Tautkan atau koreksi pembeli sebelum konfirmasi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                buyer_id: { type: string, format: uuid }
+              required: [buyer_id]
+      responses:
+        '201':
+          description: Transaksi menunggu konfirmasi pembeli
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SaleTransactionResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/sales/{saleId}:
+    delete:
+      summary: Batalkan tautan transaksi yang belum dijawab pembeli
+      parameters:
+        - { name: saleId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Transaksi dibatalkan; listing tetap terjual
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SaleTransactionResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/sales/{saleId}/respond:
+    post:
+      summary: Konfirmasi atau tolak transaksi sebagai pembeli
+      parameters:
+        - { name: saleId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision: { type: string, enum: [CONFIRM, REJECT] }
+                note: { type: string, maxLength: 500 }
+              required: [decision]
+      responses:
+        '201':
+          description: Respons pembeli tersimpan; penolakan tidak mengaktifkan listing
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SaleTransactionResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/sales/{saleId}/rating:
+    post:
+      summary: Beri rating angka 1–5 untuk transaksi terkonfirmasi
+      parameters:
+        - { name: saleId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                score: { type: integer, minimum: 1, maximum: 5 }
+              required: [score]
+      responses:
+        '201':
+          description: Rating tersimpan; satu rating per transaksi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RatingResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/listings/{listingId}/renew:
+    parameters:
+      - { $ref: '#/components/parameters/ListingId' }
+    post:
+      summary: Perpanjang listing Expired milik sendiri
+      responses:
+        '201': { description: Listing diaktifkan kembali, content: { application/json: { schema: { $ref: '#/components/schemas/ListingResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/me/listings:
+    get:
+      summary: Daftar listing milik sendiri
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200': { description: Listing milik sendiri termasuk status Sold, Expired, dan Inactive, content: { application/json: { schema: { $ref: '#/components/schemas/ListingPage' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /marketplace/listings/{listingId}/reactivate:
+    parameters:
+      - { $ref: '#/components/parameters/ListingId' }
+    post:
+      summary: Aktifkan kembali listing yang dinonaktifkan sistem
+      description: Memerlukan hak tier, kuota, dan cooldown yang sesuai; sisa masa tayang dilanjutkan.
+      responses:
+        '201': { description: Listing diaktifkan kembali }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/membership/plans:
+    get:
+      security: []
+      summary: Daftar paket membership berbayar
+      responses:
+        '200':
+          description: Paket Toko dan Juragan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/MembershipPlan' }
+                required: [data]
+  /marketplace/me/membership-requests:
+    post:
+      summary: Ajukan membership atau upgrade
+      description: Transfer manual. Bukti JPEG/PNG/PDF maksimal 5 MB disimpan privat; harga harus sesuai paket.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                tier: { type: string, enum: [TOKO, JURAGAN] }
+                payment_amount: { type: integer, minimum: 1 }
+                proof: { type: string, format: binary }
+              required: [tier, payment_amount, proof]
+      responses:
+        '201': { description: Pengajuan menunggu review admin }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/me/addon-requests:
+    post:
+      summary: Ajukan slot tambahan atau lewati cooldown
+      description: Harga add-on belum ditetapkan oleh sistem; admin memeriksa nominal transfer dan menetapkan jumlah slot yang disetujui.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                kind: { type: string, enum: [SLOT_ADDON, COOLDOWN_BYPASS] }
+                payment_amount: { type: integer, minimum: 1 }
+                slots: { type: integer, minimum: 1, maximum: 1000, description: Wajib untuk SLOT_ADDON }
+                proof: { type: string, format: binary }
+              required: [kind, payment_amount, proof]
+      responses:
+        '201': { description: Pengajuan menunggu review admin }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/me/shops/verification-requests:
+    post:
+      summary: Minta verifikasi toko manual
+      description: Verifikasi toko memberi badge dan tidak menjadi syarat hak membership.
+      responses:
+        '201': { description: Pengajuan verifikasi toko }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/me/benefit-requests:
+    get:
+      summary: Riwayat pengajuan membership, add-on, dan verifikasi toko
+      responses:
+        '200': { description: Riwayat pengajuan milik sendiri; bukti transfer tidak disertakan }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /marketplace/me/entitlements:
+    get:
+      summary: Hak membership, slot add-on, cooldown pass, dan verifikasi toko
+      responses:
+        '200': { description: Hak akun saat ini }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /marketplace/admin/benefit-requests:
+    get:
+      description: Hanya admin. Maksimal 100 pengajuan per respons.
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [PENDING, APPROVED, REJECTED] } }
+      responses:
+        '200': { description: Daftar pengajuan tanpa isi bukti transfer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /marketplace/admin/benefit-requests/{requestId}/proof:
+    get:
+      description: Hanya admin; mengunduh bukti secara privat dengan cache dinonaktifkan.
+      parameters:
+        - { name: requestId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: JPEG, PNG, atau PDF bukti transfer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /marketplace/admin/benefit-requests/{requestId}/review:
+    post:
+      description: Hanya admin. Keputusan final idempoten; penolakan wajib menyertakan alasan.
+      parameters:
+        - { name: requestId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision: { type: string, enum: [APPROVED, REJECTED] }
+                review_note: { type: string, maxLength: 500 }
+                approved_slots: { type: integer, minimum: 1, maximum: 1000, description: Jumlah final untuk pengajuan SLOT_ADDON }
+              required: [decision]
+      responses:
+        '200': { description: Pengajuan ditinjau dan audit tersimpan }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/me/sales:
+    get:
+      summary: Daftar transaksi penjualan milik sendiri
+      responses:
+        '200':
+          description: Maksimal 100 transaksi terbaru
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SaleTransactionsResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /marketplace/me/purchases:
+    get:
+      summary: Daftar transaksi pembelian milik sendiri
+      responses:
+        '200':
+          description: Maksimal 100 transaksi terbaru
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SaleTransactionsResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /marketplace/reports:
+    post:
+      summary: Laporkan listing atau pengguna
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target_type: { type: string, enum: [LISTING, USER] }
+                target_id: { type: string, format: uuid }
+                reason: { $ref: '#/components/schemas/ReportReason' }
+                details: { type: string, maxLength: 1000 }
+              required: [target_type, target_id, reason]
+      responses:
+        '201':
+          description: Laporan masuk antrean admin
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/me/reports:
+    get:
+      summary: Riwayat laporan yang dibuat sendiri
+      responses:
+        '200':
+          description: Maksimal 100 laporan terbaru
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportsResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /marketplace/admin/reports:
+    get:
+      description: Hanya admin; laporan pengguna/listing, maksimal 100 per respons.
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [OPEN, RESOLVED, DISMISSED] } }
+      responses:
+        '200':
+          description: Antrean laporan
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportsResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /marketplace/admin/reports/{reportId}/review:
+    post:
+      description: Hanya admin; tidak otomatis menangguhkan akun pengguna.
+      parameters:
+        - { name: reportId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision: { type: string, enum: [RESOLVED, DISMISSED] }
+                review_note: { type: string, minLength: 1, maxLength: 500 }
+              required: [decision, review_note]
+      responses:
+        '201':
+          description: Laporan ditinjau dan dicatat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/admin/listings/{listingId}/moderation:
+    get:
+      description: Hanya admin; riwayat hide/restore listing.
+      parameters:
+        - { name: listingId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Maksimal 100 tindakan moderasi terbaru
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationActionsResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      description: Hanya admin; hide listing aktif atau restore listing tersembunyi. Listing hidden tetap memakai kuota.
+      parameters:
+        - { name: listingId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action: { type: string, enum: [HIDE, RESTORE] }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+              required: [action, reason]
+      responses:
+        '201':
+          description: Tindakan moderasi tercatat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModerationResultResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/admin/sales/{saleId}/corrections:
+    get:
+      description: Hanya admin; audit koreksi pembeli.
+      parameters:
+        - { name: saleId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Riwayat koreksi transaksi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SaleCorrectionsResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /marketplace/admin/sales/{saleId}/correct-buyer:
+    post:
+      description: Hanya admin; mengoreksi pembeli transaksi terkonfirmasi, menghapus rating lama, lalu meminta konfirmasi pembeli baru.
+      parameters:
+        - { name: saleId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                buyer_id: { type: string, format: uuid }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+              required: [buyer_id, reason]
+      responses:
+        '201':
+          description: Pembeli dikoreksi dan transaksi menunggu konfirmasi ulang
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SaleTransactionResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /users/{userId}:
+    get:
+      security: []
+      summary: Profil publik dengan ringkasan rating
+      parameters:
+        - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Profil publik penjual, rating rata-rata, dan jumlah listing aktif
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicProfileResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /marketplace/me/quota:
+    get:
+      summary: Informasi kuota dan cooldown akun
+      responses:
+        '200':
+          description: Status kuota
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Quota' }
+                required: [data]
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /marketplace/shops:
+    post:
+      summary: Buat toko untuk akun tier berbayar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 2, maxLength: 100 }
+                description: { type: [string, 'null'], maxLength: 500 }
+              required: [name]
+      responses:
+        '201': { description: Toko dibuat }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /marketplace/shops/me:
+    get:
+      summary: Toko milik sendiri
+      responses:
+        '200': { description: Toko, content: { application/json: { schema: { $ref: '#/components/schemas/ShopResponse' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /marketplace/media/upload-signatures:
+    post:
+      summary: Minta signed upload Cloudinary
+      description: Klien mengunggah langsung ke Cloudinary dengan parameter yang dikembalikan, lalu memanggil confirm-upload. Preset harus membatasi foto ke JPEG/PNG/WebP maksimal 5 MB.
+      responses:
+        '201':
+          description: Parameter signed upload dan ID aset lokal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      asset_id: { type: string, format: uuid }
+                      cloud_name: { type: string }
+                      api_key: { type: string }
+                      timestamp: { type: integer }
+                      public_id: { type: string }
+                      folder: { type: string }
+                      allowed_formats: { type: string, const: 'jpg,png,webp' }
+                      upload_preset: { type: string }
+                      overwrite: { type: string, const: 'false' }
+                      signature: { type: string }
+                    required: [asset_id, cloud_name, api_key, timestamp, public_id, folder, allowed_formats, upload_preset, overwrite, signature]
+                required: [data]
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /marketplace/media/confirm-upload:
+    post:
+      summary: Verifikasi upload Cloudinary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                asset_id: { type: string, format: uuid }
+              required: [asset_id]
+      responses:
+        '201': { description: Aset terverifikasi }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /marketplace/media/{assetId}:
+    delete:
+      summary: Hapus aset media milik sendiri
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Aset dihapus dari Cloudinary dan database }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ListingId:
+      name: listingId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    MembershipPlan:
+      type: object
+      properties:
+        tier: { type: string, enum: [toko, juragan] }
+        price: { type: integer, enum: [40000, 100000] }
+        period_days: { type: integer, const: 30 }
+        base_quota: { type: integer }
+        listing_days: { type: integer }
+        features:
+          type: object
+          properties:
+            may_sell_new_condition: { type: boolean }
+            cooldown: { type: boolean }
+          required: [may_sell_new_condition, cooldown]
+      required: [tier, price, period_days, base_quota, listing_days, features]
+    BenefitRequest:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [membership, slot_addon, cooldown_bypass, shop_verification] }
+        status: { type: string, enum: [pending, approved, rejected] }
+        requested_tier: { type: [string, 'null'], enum: [toko, juragan, null] }
+        requested_slots: { type: [integer, 'null'] }
+        approved_slots: { type: [integer, 'null'] }
+        payment_amount: { type: [integer, 'null'] }
+        proof_available: { type: boolean }
+        proof_mime_type: { type: [string, 'null'], enum: [image/jpeg, image/png, application/pdf, null] }
+        review_note: { type: [string, 'null'] }
+        reviewed_at: { type: [string, 'null'], format: date-time }
+        entitlement_starts_at: { type: [string, 'null'], format: date-time }
+        entitlement_expires_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+      required: [id, kind, status, requested_tier, requested_slots, approved_slots, payment_amount, proof_available, proof_mime_type, review_note, reviewed_at, entitlement_starts_at, entitlement_expires_at, created_at]
+    SaleTransaction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        listing:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            title: { type: string }
+            price: { type: integer }
+          required: [id, title, price]
+        seller:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            display_name: { type: string }
+          required: [id, display_name]
+        buyer:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            display_name: { type: string }
+          required: [id, display_name]
+        status: { type: string, enum: [awaiting_confirmation, confirmed, rejected, cancelled] }
+        response_note: { type: [string, 'null'] }
+        responded_at: { type: [string, 'null'], format: date-time }
+        rating:
+          anyOf:
+            - { $ref: '#/components/schemas/Rating' }
+            - { type: 'null' }
+        created_at: { type: string, format: date-time }
+      required: [id, listing, seller, buyer, status, response_note, responded_at, rating, created_at]
+    SaleTransactionResponse:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/SaleTransaction' }
+      required: [data]
+    SaleTransactionsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/SaleTransaction' }
+      required: [data]
+    MarkSoldResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            status: { type: string, enum: [sold] }
+            sold_at: { type: string, format: date-time }
+            transaction:
+              anyOf:
+                - type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    buyer_id: { type: string, format: uuid }
+                    status: { type: string, enum: [awaiting_confirmation] }
+                  required: [id, buyer_id, status]
+                - { type: 'null' }
+          required: [id, status, sold_at, transaction]
+      required: [data]
+    Rating:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        score: { type: integer, minimum: 1, maximum: 5 }
+        created_at: { type: string, format: date-time }
+      required: [id, score, created_at]
+    RatingResponse:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/Rating' }
+      required: [data]
+    ReportReason:
+      type: string
+      enum: [SPAM, SCAM, PROHIBITED_ITEM, MISLEADING, HARASSMENT, OTHER]
+    Report:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        reporter:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            display_name: { type: string }
+          required: [id, display_name]
+        target:
+          type: [object, 'null']
+          properties:
+            type: { type: string, enum: [listing, user] }
+            id: { type: string, format: uuid }
+            title: { type: string }
+            display_name: { type: string }
+          required: [type, id]
+        reason: { type: string, enum: [spam, scam, prohibited_item, misleading, harassment, other] }
+        details: { type: [string, 'null'] }
+        status: { type: string, enum: [open, resolved, dismissed] }
+        review_note: { type: [string, 'null'] }
+        reviewed_by:
+          anyOf:
+            - type: object
+              properties:
+                id: { type: string, format: uuid }
+                display_name: { type: string }
+              required: [id, display_name]
+            - { type: 'null' }
+        reviewed_at: { type: [string, 'null'], format: date-time }
+        listing_hidden: { type: boolean }
+        created_at: { type: string, format: date-time }
+      required: [id, reporter, target, reason, details, status, review_note, reviewed_by, reviewed_at, listing_hidden, created_at]
+    ReportResponse:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/Report' }
+      required: [data]
+    ReportsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Report' }
+      required: [data]
+    ModerationAction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        action: { type: string, enum: [hide, restore] }
+        reason: { type: string }
+        admin:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            display_name: { type: string }
+          required: [id, display_name]
+        created_at: { type: string, format: date-time }
+      required: [id, action, reason, admin, created_at]
+    ModerationActionsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/ModerationAction' }
+      required: [data]
+    ModerationResultResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            hidden: { type: boolean }
+            moderation_reason: { type: [string, 'null'] }
+          required: [id, hidden, moderation_reason]
+      required: [data]
+    SaleCorrection:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        action: { type: string, enum: [buyer_corrected] }
+        reason: { type: string }
+        admin: { $ref: '#/components/schemas/UserSummary' }
+        previous_buyer: { $ref: '#/components/schemas/UserSummary' }
+        new_buyer: { $ref: '#/components/schemas/UserSummary' }
+        created_at: { type: string, format: date-time }
+      required: [id, action, reason, admin, previous_buyer, new_buyer, created_at]
+    SaleCorrectionsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/SaleCorrection' }
+      required: [data]
+    UserSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        display_name: { type: string }
+      required: [id, display_name]
+    PublicProfile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        display_name: { type: string }
+        avatar_url: { type: [string, 'null'], format: uri }
+        tier: { type: string, enum: [personal, toko, juragan] }
+        verified_store: { type: boolean }
+        rating_average: { type: [number, 'null'] }
+        rating_count: { type: integer }
+        active_listing_count: { type: integer }
+        bio: { type: [string, 'null'] }
+      required: [id, display_name, avatar_url, tier, verified_store, rating_average, rating_count, active_listing_count, bio]
+    PublicProfileResponse:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/PublicProfile' }
+      required: [data]
+    Condition:
+      type: string
+      enum: [BNIB, NEW, LIKE_NEW, SECOND]
+    Category:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+      required: [id, slug, name]
+    Tag:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        minimum_tier: { type: string, enum: [personal, toko, juragan] }
+      required: [id, slug, name, minimum_tier]
+    Region:
+      type: object
+      properties:
+        code: { type: string, example: '33.74.11.1005' }
+        district_code: { type: string, example: '33.74.11' }
+        district: { type: string }
+        kelurahan: { type: string }
+      required: [code, district_code, district, kelurahan]
+    Listing:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        price: { type: integer, minimum: 1 }
+        condition: { $ref: '#/components/schemas/Condition' }
+        status: { type: string, enum: [active, sold, expired, inactive] }
+        category: { $ref: '#/components/schemas/Category' }
+        location: { $ref: '#/components/schemas/Region' }
+        photos:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              url: { type: [string, 'null'], format: uri }
+            required: [id, url]
+        seller:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            display_name: { type: string }
+            avatar_url: { type: [string, 'null'], format: uri }
+            tier: { type: string, enum: [personal, toko, juragan] }
+            verified_store: { type: boolean }
+            shop: { type: [object, 'null'] }
+            whatsapp_url: { type: [string, 'null'], format: uri }
+        expires_at: { type: string, format: date-time, description: Sisa masa tayang dibekukan saat sistem menonaktifkan listing }
+        suspended_at: { type: [string, 'null'], format: date-time }
+        suspension_reason: { type: [string, 'null'], enum: [tier_condition, quota, null] }
+        moderation_hidden_at: { type: [string, 'null'], format: date-time }
+        moderation_reason: { type: [string, 'null'] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      required: [id, title, description, price, condition, status, category, location, photos, seller, expires_at, suspended_at, suspension_reason, moderation_hidden_at, moderation_reason, created_at, updated_at]
+    CreateListing:
+      type: object
+      properties:
+        category_id: { type: string, format: uuid }
+        region_code: { type: string, maxLength: 32 }
+        shop_id: { type: string, format: uuid }
+        title: { type: string, minLength: 5, maxLength: 120 }
+        description: { type: string, minLength: 10, maxLength: 5000 }
+        price: { type: integer, minimum: 1, maximum: 2147483647 }
+        condition: { $ref: '#/components/schemas/Condition' }
+        photo_ids:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items: { type: string, format: uuid }
+        cooldown_pass_id: { type: string, format: uuid, description: Opsional; dikonsumsi hanya jika listing berhasil dibuat saat cooldown aktif }
+      required: [category_id, region_code, title, description, price, condition, photo_ids]
+    UpdateListing:
+      type: object
+      properties:
+        category_id: { type: string, format: uuid }
+        region_code: { type: string, maxLength: 32 }
+        title: { type: string, minLength: 5, maxLength: 120 }
+        description: { type: string, minLength: 10, maxLength: 5000 }
+        price: { type: integer, minimum: 1, maximum: 2147483647 }
+        condition: { $ref: '#/components/schemas/Condition' }
+        photo_ids:
+          type: array
+          description: Jika diberikan, sertakan foto yang sudah terpasang dan foto terverifikasi yang ingin ditambahkan. Hapus foto lama melalui endpoint DELETE media.
+          minItems: 1
+          maxItems: 8
+          items: { type: string, format: uuid }
+    ListingResponse:
+      type: object
+      properties:
+        data: { $ref: '#/components/schemas/Listing' }
+      required: [data]
+    ListingPage:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Listing' }
+            pagination:
+              type: object
+              properties:
+                page: { type: integer }
+                limit: { type: integer }
+                total: { type: integer }
+                pages: { type: integer }
+              required: [page, limit, total, pages]
+          required: [items, pagination]
+      required: [data]
+    Quota:
+      type: object
+      properties:
+        tier: { type: string, enum: [personal, toko, juragan] }
+        active_listings: { type: integer }
+        base_quota: { type: integer }
+        inactive_listings: { type: integer }
+        addon_slots: { type: integer }
+        total_quota: { type: integer }
+        available_slots: { type: integer }
+        available_cooldown_passes: { type: integer }
+        cooldown_until: { type: [string, 'null'], format: date-time }
+        may_list: { type: boolean }
+        may_list_with_cooldown_pass: { type: boolean }
+      required: [tier, active_listings, inactive_listings, base_quota, addon_slots, total_quota, available_slots, available_cooldown_passes, cooldown_until, may_list, may_list_with_cooldown_pass]
+    ShopResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            description: { type: [string, 'null'] }
+            verification_status: { type: string, enum: [unverified, pending, verified, rejected] }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+          required: [id, name, description, verification_status, created_at, updated_at]
+      required: [data]
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+          required: [code, message]
+      required: [error]
+  responses:
+    BadRequest:
+      description: Request tidak valid
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unauthorized:
+      description: Autentikasi diperlukan
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Forbidden:
+      description: Akses ditolak
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: Resource tidak ditemukan
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflict:
+      description: Request bertentangan dengan kondisi saat ini
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unavailable:
+      description: Media provider tidak tersedia
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

@@ -1,0 +1,1575 @@
+openapi: 3.0.3
+info:
+  title: Aquascape Forum & Marketplace API
+  version: 0.1.0
+  description: |
+    Kontrak API MVP untuk platform forum + marketplace hobiis aquascape (fokus Semarang).
+
+    Catatan desain:
+    - REST + JSON, semua endpoint berada di bawah `/api/v1`.
+    - Autentikasi memakai JWT Bearer. Tier dan hak akses dibaca di backend, bukan dipercaya dari klien.
+    - Aturan bisnis (kuota, cooldown, tag per tier) SELALU divalidasi di backend.
+    - Data relasional (akun, tier, listing, kuota, rating, laporan) disimpan di PostgreSQL.
+    - Data fleksibel (posting, komentar, tank profile) disimpan di MongoDB.
+    - Nilai angka (kuota, harga, masa tayang) adalah asumsi awal dan dapat diubah.
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Lokal (development)
+  - url: https://api.example.com/api/v1
+    description: Production (contoh)
+
+tags:
+  - name: Auth
+  - name: Users
+  - name: Memberships
+  - name: Listings
+  - name: Quota
+  - name: Tags
+  - name: Forum
+  - name: Trust
+  - name: Uploads
+  - name: TankProfiles
+  - name: Admin
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ------------------------------------------------------------------ AUTH
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Daftar akun baru (otomatis tier personal)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Akun dibuat, kode verifikasi HP dikirim
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '409':
+          description: Email atau nomor HP sudah terdaftar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/verify-phone:
+    post:
+      tags: [Auth]
+      summary: Verifikasi nomor HP dengan kode OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  example: '123456'
+      responses:
+        '200':
+          description: Nomor HP terverifikasi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Kode salah atau kedaluwarsa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Masuk dan dapatkan token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Perbarui access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token baru
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ----------------------------------------------------------------- USERS
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Profil sendiri (termasuk tier)
+      responses:
+        '200':
+          description: Profil pengguna
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Users]
+      summary: Ubah profil sendiri
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+                avatar_url:
+                  type: string
+                  format: uri
+                whatsapp_number:
+                  type: string
+                  example: '+6281234567890'
+                bio:
+                  type: string
+      responses:
+        '200':
+          description: Profil diperbarui
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/me/quota:
+    get:
+      tags: [Quota]
+      summary: Sisa kuota listing dan status cooldown
+      responses:
+        '200':
+          description: Info kuota
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Quota'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Profil publik pengguna/penjual
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Profil publik
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicUser'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ----------------------------------------------------------- MEMBERSHIPS
+  /memberships/plans:
+    get:
+      tags: [Memberships]
+      summary: Daftar tier, harga, dan batasnya
+      security: []
+      responses:
+        '200':
+          description: Daftar paket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MembershipPlan'
+
+  /memberships/upgrade-requests:
+    post:
+      tags: [Memberships]
+      summary: Ajukan upgrade tier (aktivasi manual oleh admin pada MVP)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_tier]
+              properties:
+                target_tier:
+                  type: string
+                  enum: [toko, juragan]
+                store_name:
+                  type: string
+                  description: Wajib untuk tier toko/juragan
+                store_address:
+                  type: string
+                payment_proof_url:
+                  type: string
+                  format: uri
+      responses:
+        '201':
+          description: Pengajuan dibuat, menunggu persetujuan admin
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UpgradeRequest'
+        '403':
+          $ref: '#/components/responses/PhoneNotVerified'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /addons/purchase-requests:
+    post:
+      tags: [Quota]
+      summary: Ajukan pembelian slot listing atau lewati cooldown
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [extra_slot, slot_pack_5, skip_cooldown]
+                payment_proof_url:
+                  type: string
+                  format: uri
+      responses:
+        '201':
+          description: Pengajuan dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AddonPurchase'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # -------------------------------------------------------------- LISTINGS
+  /listings:
+    get:
+      tags: [Listings]
+      summary: Daftar listing dengan filter
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: q
+          in: query
+          description: Kata kunci pencarian
+          schema:
+            type: string
+        - name: tag
+          in: query
+          description: Filter satu atau beberapa tag (kode tag, dipisah koma)
+          schema:
+            type: string
+            example: second-good,cod-semarang
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/ListingCategory'
+        - name: seller_tier
+          in: query
+          schema:
+            $ref: '#/components/schemas/Tier'
+        - name: min_price
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+        - name: max_price
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, price_asc, price_desc]
+            default: newest
+      responses:
+        '200':
+          description: Daftar listing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Listing'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+    post:
+      tags: [Listings]
+      summary: Pasang listing baru (memvalidasi tier, tag, foto, cooldown, kuota)
+      description: |
+        Urutan validasi di backend:
+        1. Token valid dan nomor HP terverifikasi
+        2. Tag diizinkan untuk tier penjual (BNIB/New hanya toko dan juragan)
+        3. Jumlah foto memenuhi aturan (mis. minimal 3 untuk Second/Like New)
+        4. Cooldown tidak aktif
+        5. Kuota listing aktif belum penuh
+        6. Simpan dengan `expires_at` sesuai tier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListingCreate'
+      responses:
+        '201':
+          description: Listing dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Listing'
+                  quota:
+                    $ref: '#/components/schemas/Quota'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Nomor HP belum diverifikasi atau tag tidak diizinkan (`PHONE_NOT_VERIFIED` / `TAG_NOT_ALLOWED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Kuota penuh atau cooldown aktif (`QUOTA_EXCEEDED` / `COOLDOWN_ACTIVE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: QUOTA_EXCEEDED
+                  message: Kuota listing aktif penuh (5/5).
+                  details:
+                    cooldown_until: '2026-11-11T08:00:00Z'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /listings/{listingId}:
+    parameters:
+      - $ref: '#/components/parameters/ListingId'
+    get:
+      tags: [Listings]
+      summary: Detail listing
+      security: []
+      responses:
+        '200':
+          description: Detail listing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Listing'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Listings]
+      summary: Ubah listing milik sendiri
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListingUpdate'
+      responses:
+        '200':
+          description: Listing diperbarui
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Listing'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Listings]
+      summary: Hapus listing milik sendiri (soft delete, status removed)
+      responses:
+        '204':
+          description: Listing dihapus
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /listings/{listingId}/mark-sold:
+    post:
+      tags: [Listings]
+      summary: Tandai listing terjual (menjadi dasar perhitungan cooldown)
+      parameters:
+        - $ref: '#/components/parameters/ListingId'
+      responses:
+        '200':
+          description: Status berubah menjadi sold
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Listing'
+                  quota:
+                    $ref: '#/components/schemas/Quota'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Listing tidak berstatus active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ------------------------------------------------------------------ TAGS
+  /tags:
+    get:
+      tags: [Tags]
+      summary: Daftar tag beserta tier yang boleh memakainya
+      security: []
+      responses:
+        '200':
+          description: Daftar tag
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Tag'
+
+  # ----------------------------------------------------------------- FORUM
+  /posts:
+    get:
+      tags: [Forum]
+      summary: Daftar posting forum
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: category
+          in: query
+          schema:
+            $ref: '#/components/schemas/PostCategory'
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, popular]
+            default: newest
+      responses:
+        '200':
+          description: Daftar posting
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+    post:
+      tags: [Forum]
+      summary: Buat posting baru
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCreate'
+      responses:
+        '201':
+          description: Posting dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Post'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /posts/{postId}:
+    parameters:
+      - $ref: '#/components/parameters/PostId'
+    get:
+      tags: [Forum]
+      summary: Detail posting beserta komentar
+      security: []
+      responses:
+        '200':
+          description: Detail posting
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Post'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /posts/{postId}/comments:
+    parameters:
+      - $ref: '#/components/parameters/PostId'
+    get:
+      tags: [Forum]
+      summary: Daftar komentar pada posting
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Daftar komentar
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+    post:
+      tags: [Forum]
+      summary: Tambah komentar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                photos:
+                  type: array
+                  items:
+                    type: string
+                    format: uri
+      responses:
+        '201':
+          description: Komentar dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Comment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ----------------------------------------------------------------- TRUST
+  /ratings:
+    post:
+      tags: [Trust]
+      summary: Beri rating pada penjual setelah transaksi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [seller_id, score]
+              properties:
+                seller_id:
+                  type: string
+                listing_id:
+                  type: string
+                score:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                comment:
+                  type: string
+      responses:
+        '201':
+          description: Rating tersimpan
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Sudah pernah memberi rating untuk transaksi ini
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /reports:
+    post:
+      tags: [Trust]
+      summary: Laporkan listing, posting, atau pengguna
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_type, target_id, reason]
+              properties:
+                target_type:
+                  type: string
+                  enum: [listing, post, comment, user]
+                target_id:
+                  type: string
+                reason:
+                  type: string
+                  enum: [wrong_tag, fake_item, scam, inappropriate, other]
+                note:
+                  type: string
+      responses:
+        '201':
+          description: Laporan diterima
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # --------------------------------------------------------------- UPLOADS
+  /uploads/presign:
+    post:
+      tags: [Uploads]
+      summary: Minta URL upload langsung ke object storage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, content_type]
+              properties:
+                filename:
+                  type: string
+                content_type:
+                  type: string
+                  enum: [image/jpeg, image/png, image/webp]
+                purpose:
+                  type: string
+                  enum: [listing, post, avatar, tank, payment_proof]
+      responses:
+        '200':
+          description: URL upload sementara
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      upload_url:
+                        type: string
+                        format: uri
+                      public_url:
+                        type: string
+                        format: uri
+                      expires_in:
+                        type: integer
+                        description: Detik
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ---------------------------------------------------------- TANK PROFILE
+  /tank-profiles:
+    get:
+      tags: [TankProfiles]
+      summary: Daftar tank profile (fitur unggulan, contoh)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: owner_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Daftar tank profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TankProfile'
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+    post:
+      tags: [TankProfiles]
+      summary: Buat tank profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TankProfileCreate'
+      responses:
+        '201':
+          description: Tank profile dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TankProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /tank-profiles/{tankId}:
+    parameters:
+      - name: tankId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [TankProfiles]
+      summary: Detail tank profile
+      security: []
+      responses:
+        '200':
+          description: Detail tank profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TankProfile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ----------------------------------------------------------------- ADMIN
+  /admin/users/{userId}/membership:
+    patch:
+      tags: [Admin]
+      summary: Aktifkan atau ubah tier pengguna (setelah pembayaran diverifikasi)
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tier]
+              properties:
+                tier:
+                  $ref: '#/components/schemas/Tier'
+                expires_at:
+                  type: string
+                  format: date-time
+                verified_store:
+                  type: boolean
+      responses:
+        '200':
+          description: Tier diperbarui
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/reports:
+    get:
+      tags: [Admin]
+      summary: Daftar laporan untuk moderasi
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, resolved, dismissed]
+            default: open
+      responses:
+        '200':
+          description: Daftar laporan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        target_type:
+                          type: string
+                        target_id:
+                          type: string
+                        reason:
+                          type: string
+                        status:
+                          type: string
+                        created_at:
+                          type: string
+                          format: date-time
+                  meta:
+                    $ref: '#/components/schemas/PageMeta'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /admin/listings/{listingId}:
+    patch:
+      tags: [Admin]
+      summary: Moderasi listing (hapus atau perbaiki tag)
+      parameters:
+        - $ref: '#/components/parameters/ListingId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [active, removed]
+                tags:
+                  type: array
+                  items:
+                    type: string
+                moderation_note:
+                  type: string
+      responses:
+        '200':
+          description: Listing dimoderasi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Listing'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ==================================================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+    ListingId:
+      name: listingId
+      in: path
+      required: true
+      schema:
+        type: string
+    PostId:
+      name: postId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    Unauthorized:
+      description: Belum login atau token tidak valid (`UNAUTHORIZED`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Tidak berhak mengakses (`FORBIDDEN`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Data tidak ditemukan (`NOT_FOUND`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Data tidak valid (`VALIDATION_ERROR`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Foto minimal 3 untuk kondisi Second.
+              details:
+                field: photos
+    PhoneNotVerified:
+      description: Nomor HP belum diverifikasi (`PHONE_NOT_VERIFIED`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooManyRequests:
+      description: Terlalu banyak percobaan (`RATE_LIMITED`)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    # ------------------------------------------------------------- umum
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - VALIDATION_ERROR
+                - TAG_NOT_ALLOWED
+                - QUOTA_EXCEEDED
+                - COOLDOWN_ACTIVE
+                - PHONE_NOT_VERIFIED
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - NOT_FOUND
+                - CONFLICT
+                - RATE_LIMITED
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+
+    PageMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+
+    Tier:
+      type: string
+      enum: [personal, toko, juragan]
+      description: Tier ketiga bernama "juragan" (tier penjual volume tinggi).
+
+    # -------------------------------------------------------------- auth
+    RegisterRequest:
+      type: object
+      required: [email, password, display_name, phone_number]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+        display_name:
+          type: string
+        phone_number:
+          type: string
+          example: '+6281234567890'
+
+    AuthTokens:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            access_token:
+              type: string
+            refresh_token:
+              type: string
+            expires_in:
+              type: integer
+              description: Detik
+            user:
+              $ref: '#/components/schemas/User'
+
+    # ------------------------------------------------------------- users
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: usr_1a2b
+        email:
+          type: string
+          format: email
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        phone_verified:
+          type: boolean
+        tier:
+          $ref: '#/components/schemas/Tier'
+        tier_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        verified_store:
+          type: boolean
+        role:
+          type: string
+          enum: [member, admin]
+        created_at:
+          type: string
+          format: date-time
+
+    PublicUser:
+      type: object
+      properties:
+        id:
+          type: string
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        tier:
+          $ref: '#/components/schemas/Tier'
+        verified_store:
+          type: boolean
+        rating_average:
+          type: number
+          format: float
+          nullable: true
+        rating_count:
+          type: integer
+        active_listing_count:
+          type: integer
+        bio:
+          type: string
+          nullable: true
+
+    MembershipPlan:
+      type: object
+      properties:
+        tier:
+          $ref: '#/components/schemas/Tier'
+        name:
+          type: string
+        price_per_month:
+          type: integer
+          description: Rupiah
+          example: 40000
+        max_active_listings:
+          type: integer
+        listing_duration_days:
+          type: integer
+          nullable: true
+          description: null berarti tidak dibatasi
+        cooldown_days:
+          type: integer
+          description: 0 berarti tidak ada cooldown
+        can_sell_new_items:
+          type: boolean
+        features:
+          type: array
+          items:
+            type: string
+
+    UpgradeRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        target_tier:
+          $ref: '#/components/schemas/Tier'
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        created_at:
+          type: string
+          format: date-time
+
+    AddonPurchase:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [extra_slot, slot_pack_5, skip_cooldown]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        created_at:
+          type: string
+          format: date-time
+
+    Quota:
+      type: object
+      properties:
+        tier:
+          $ref: '#/components/schemas/Tier'
+        used:
+          type: integer
+          description: Dihitung dari jumlah listing berstatus active
+          example: 4
+        limit:
+          type: integer
+          description: Batas tier ditambah slot add-on
+          example: 5
+        cooldown_until:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ------------------------------------------------------------- tags
+    Tag:
+      type: object
+      properties:
+        code:
+          type: string
+          example: second-good
+        label:
+          type: string
+          example: Second (Good)
+        group:
+          type: string
+          enum: [condition, live, extra]
+        allowed_tiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tier'
+        min_photos:
+          type: integer
+          description: Jumlah foto minimal untuk tag ini
+          example: 3
+
+    # --------------------------------------------------------- listings
+    ListingCategory:
+      type: string
+      enum: [plant, fauna, equipment, hardscape, substrate, other]
+
+    ListingStatus:
+      type: string
+      enum: [active, sold, expired, removed]
+
+    ListingCreate:
+      type: object
+      required: [title, category, tags, price, photos]
+      properties:
+        title:
+          type: string
+          example: Trimmingan Hemianthus Callitrichoides
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/ListingCategory'
+        tags:
+          type: array
+          items:
+            type: string
+          example: [trimmingan, cod-semarang]
+        price:
+          type: integer
+          description: Rupiah
+          minimum: 0
+          example: 25000
+        photos:
+          type: array
+          items:
+            type: string
+            format: uri
+        pickup_area:
+          type: string
+          description: Area COD/meetup di Semarang
+          example: Tembalang
+
+    ListingUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        price:
+          type: integer
+          minimum: 0
+        photos:
+          type: array
+          items:
+            type: string
+            format: uri
+        pickup_area:
+          type: string
+
+    Listing:
+      type: object
+      properties:
+        id:
+          type: string
+          example: lst_8f3a
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/ListingCategory'
+        tags:
+          type: array
+          items:
+            type: string
+        price:
+          type: integer
+        photos:
+          type: array
+          items:
+            type: string
+            format: uri
+        pickup_area:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/ListingStatus'
+        seller:
+          $ref: '#/components/schemas/PublicUser'
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    # ------------------------------------------------------------ forum
+    PostCategory:
+      type: string
+      enum: [question, showcase, troubleshooting, discussion, event]
+
+    PostCreate:
+      type: object
+      required: [title, body, category]
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+        category:
+          $ref: '#/components/schemas/PostCategory'
+        photos:
+          type: array
+          items:
+            type: string
+            format: uri
+        water_params:
+          type: object
+          description: Parameter air untuk thread troubleshooting (opsional)
+          properties:
+            ph:
+              type: number
+            kh:
+              type: number
+            gh:
+              type: number
+            temperature_c:
+              type: number
+        linked_listing_ids:
+          type: array
+          description: Tautan ke listing di marketplace (PostgreSQL)
+          items:
+            type: string
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+          example: pst_5c9d
+        title:
+          type: string
+        body:
+          type: string
+        category:
+          $ref: '#/components/schemas/PostCategory'
+        photos:
+          type: array
+          items:
+            type: string
+            format: uri
+        water_params:
+          type: object
+          additionalProperties: true
+        linked_listing_ids:
+          type: array
+          items:
+            type: string
+        author:
+          type: object
+          description: Salinan ringkas data penulis (denormalisasi dari PostgreSQL)
+          properties:
+            id:
+              type: string
+            display_name:
+              type: string
+            avatar_url:
+              type: string
+              format: uri
+              nullable: true
+            tier:
+              $ref: '#/components/schemas/Tier'
+        comment_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        post_id:
+          type: string
+        body:
+          type: string
+        photos:
+          type: array
+          items:
+            type: string
+            format: uri
+        author:
+          type: object
+          properties:
+            id:
+              type: string
+            display_name:
+              type: string
+            avatar_url:
+              type: string
+              format: uri
+              nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    # ------------------------------------------------------ tank profile
+    TankProfileCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        size_cm:
+          type: object
+          properties:
+            length:
+              type: number
+            width:
+              type: number
+            height:
+              type: number
+        equipment:
+          type: object
+          description: Lampu, filter, CO2, dan sebagainya
+          additionalProperties: true
+        plants:
+          type: array
+          items:
+            type: string
+        fauna:
+          type: array
+          items:
+            type: string
+        linked_listing_ids:
+          type: array
+          description: Produk yang dipakai (referensi ke listing di PostgreSQL)
+          items:
+            type: string
+        photos:
+          type: array
+          items:
+            type: string
+            format: uri
+
+    TankProfile:
+      allOf:
+        - $ref: '#/components/schemas/TankProfileCreate'
+        - type: object
+          properties:
+            id:
+              type: string
+            owner_id:
+              type: string
+            created_at:
+              type: string
+              format: date-time
