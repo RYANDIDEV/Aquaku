@@ -18,7 +18,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
 
   let upstreamUrl: URL;
   try {
-    const baseUrl = process.env.AQUAKU_API_BASE_URL ?? "https://aquaku-backend-staging.up.railway.app/api/v1";
+    const baseUrl = process.env.AQUAKU_API_BASE_URL ?? "http://localhost:3000/api/v1";
     upstreamUrl = new URL(baseUrl);
     if (upstreamUrl.protocol !== "http:" && upstreamUrl.protocol !== "https:") {
       throw new Error("AQUAKU_API_BASE_URL harus menggunakan HTTP atau HTTPS.");
@@ -40,10 +40,20 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
   }
 
   try {
+    let bodyBuffer: ArrayBuffer | undefined;
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      const rawBuffer = await request.arrayBuffer();
+      if (rawBuffer.byteLength > 0) {
+        bodyBuffer = rawBuffer;
+      } else {
+        headers.delete("content-type");
+      }
+    }
+
     const upstreamResponse = await fetch(upstreamUrl, {
       method: request.method,
       headers,
-      body: request.method === "GET" ? undefined : await request.arrayBuffer(),
+      body: bodyBuffer,
       cache: "no-store",
       redirect: "manual",
     });
