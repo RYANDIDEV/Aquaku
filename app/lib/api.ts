@@ -37,8 +37,8 @@ export function formatApiError(error: unknown): {
     switch (error.status) {
       case 400:
         return {
-          title: "400 Bad Request",
-          message: baseMessage || "Payload atau parameter yang dikirim tidak valid.",
+          title: "Data belum sesuai",
+          message: baseMessage || "Periksa kembali data yang kamu isi.",
           status: 400,
           code: error.code,
           isUnauthorized: false,
@@ -46,8 +46,8 @@ export function formatApiError(error: unknown): {
         };
       case 401:
         return {
-          title: "401 Unauthorized",
-          message: baseMessage || "Access token tidak ada atau tidak valid. Silakan login atau perbarui token.",
+          title: "Silakan masuk kembali",
+          message: baseMessage || "Sesi kamu telah berakhir. Silakan masuk untuk melanjutkan.",
           status: 401,
           code: error.code,
           isUnauthorized: true,
@@ -55,10 +55,10 @@ export function formatApiError(error: unknown): {
         };
       case 403:
         return {
-          title: "403 Forbidden",
+          title: "Akses tidak diizinkan",
           message:
             baseMessage ||
-            "Akses ditolak: pastikan akun adalah pemilik/pembeli/admin yang berhak dan nomor HP sudah terverifikasi.",
+            "Pastikan nomor HP kamu sudah terverifikasi dan kamu memiliki akses untuk tindakan ini.",
           status: 403,
           code: error.code,
           isUnauthorized: false,
@@ -66,8 +66,8 @@ export function formatApiError(error: unknown): {
         };
       case 404:
         return {
-          title: "404 Not Found",
-          message: baseMessage || "Resource tidak ditemukan atau listing tidak tersedia secara publik.",
+          title: "Data tidak ditemukan",
+          message: baseMessage || "Data yang kamu cari sudah tidak tersedia.",
           status: 404,
           code: error.code,
           isUnauthorized: false,
@@ -75,10 +75,10 @@ export function formatApiError(error: unknown): {
         };
       case 409:
         return {
-          title: "409 Conflict",
+          title: "Tidak dapat diproses",
           message:
             baseMessage ||
-            "Transisi status tidak diizinkan, transaksi/laporan duplikat, atau rating tidak dapat diubah. Data telah dimuat ulang.",
+            "Tindakan ini sudah pernah dilakukan atau status data telah berubah.",
           status: 409,
           code: error.code,
           isUnauthorized: false,
@@ -86,8 +86,8 @@ export function formatApiError(error: unknown): {
         };
       case 502:
         return {
-          title: "502 Bad Gateway",
-          message: "Backend API belum bisa dihubungi. Pastikan server backend aktif di http://localhost:3000/api/v1.",
+          title: "Koneksi ke server terputus",
+          message: "Layanan sedang tidak dapat dihubungi. Coba beberapa saat lagi.",
           status: 502,
           code: error.code,
           isUnauthorized: false,
@@ -95,10 +95,10 @@ export function formatApiError(error: unknown): {
         };
       case 503:
         return {
-          title: "503 Service Unavailable",
+          title: "Layanan belum tersedia",
           message:
             baseMessage ||
-            "Layanan eksternal (seperti Cloudinary atau provider OTP) belum terkonfigurasi atau tidak tersedia.",
+            "Fitur ini sedang dalam pemeliharaan. Silakan coba lagi nanti.",
           status: 503,
           code: error.code,
           isUnauthorized: false,
@@ -106,8 +106,8 @@ export function formatApiError(error: unknown): {
         };
       default:
         return {
-          title: `Error ${error.status}`,
-          message: baseMessage,
+          title: "Terjadi kendala",
+          message: baseMessage || "Permintaan belum dapat diproses saat ini.",
           status: error.status,
           code: error.code,
           isUnauthorized: false,
@@ -117,8 +117,8 @@ export function formatApiError(error: unknown): {
   }
 
   return {
-    title: "Kesalahan",
-    message: error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.",
+    title: "Terjadi kendala",
+    message: error instanceof Error ? error.message : "Terjadi kesalahan. Silakan coba lagi.",
     isUnauthorized: false,
     isConflict: false,
   };
@@ -158,7 +158,7 @@ export async function apiRequest<T>(path: string, options?: RequestOptions): Pro
   if (!response.ok) {
     const errorBody = body as ApiErrorBody | null;
     throw new ApiError(
-      errorBody?.error?.message ?? `Permintaan API gagal (${response.status}).`,
+      errorBody?.error?.message ?? "Permintaan belum dapat diproses.",
       response.status,
       errorBody?.error?.code,
     );

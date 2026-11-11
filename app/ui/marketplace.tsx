@@ -26,7 +26,6 @@ import type {
   ReportTargetType,
   SaleCorrection,
   SaleTransaction,
-  Tag,
   Taxonomy,
   TokenPair,
   UploadSignatureData,
@@ -50,7 +49,6 @@ type BannerNotice = {
   type: "success" | "error" | "warning" | "info";
   title: string;
   message: string;
-  code?: string;
 };
 
 const INITIAL_FILTERS: Filters = {
@@ -66,33 +64,48 @@ const INITIAL_FILTERS: Filters = {
 
 const CONDITION_LABELS: Record<Condition, string> = {
   BNIB: "BNIB",
-  NEW: "New",
-  LIKE_NEW: "Like New",
-  SECOND: "Second",
+  NEW: "Baru",
+  LIKE_NEW: "Seperti Baru",
+  SECOND: "Bekas",
 };
 
 const LISTING_STATUS_LABELS: Record<Listing["status"], string> = {
-  active: "Active",
-  sold: "Sold",
-  expired: "Expired",
-  inactive: "Inactive",
+  active: "Aktif",
+  sold: "Terjual",
+  expired: "Kedaluwarsa",
+  inactive: "Nonaktif",
 };
 
 const TRANSACTION_STATUS_LABELS: Record<SaleTransaction["status"], string> = {
-  awaiting_confirmation: "Menunggu Konfirmasi Pembeli",
-  confirmed: "Confirmed (Terkonfirmasi)",
-  rejected: "Rejected (Ditolak Pembeli)",
-  cancelled: "Cancelled (Dibatalkan Penjual)",
+  awaiting_confirmation: "Menunggu Konfirmasi",
+  confirmed: "Terkonfirmasi",
+  rejected: "Ditolak",
+  cancelled: "Dibatalkan",
+};
+
+const REPORT_STATUS_LABELS: Record<Report["status"], string> = {
+  open: "Menunggu Tinjauan",
+  resolved: "Ditindaklanjuti",
+  dismissed: "Ditolak",
 };
 
 const REPORT_REASONS: Array<{ value: ReportReason; label: string }> = [
-  { value: "SPAM", label: "SPAM — Spam atau iklan berulang" },
-  { value: "SCAM", label: "SCAM — Indikasi penipuan" },
-  { value: "PROHIBITED_ITEM", label: "PROHIBITED_ITEM — Barang terlarang/dilindungi" },
-  { value: "MISLEADING", label: "MISLEADING — Informasi/foto menyesatkan" },
-  { value: "HARASSMENT", label: "HARASSMENT — Pelecehan atau penyalahgunaan" },
-  { value: "OTHER", label: "OTHER — Lainnya" },
+  { value: "SPAM", label: "Spam atau iklan berulang" },
+  { value: "SCAM", label: "Indikasi penipuan" },
+  { value: "PROHIBITED_ITEM", label: "Barang terlarang atau dilindungi" },
+  { value: "MISLEADING", label: "Informasi atau foto tidak sesuai" },
+  { value: "HARASSMENT", label: "Pelecehan atau penyalahgunaan" },
+  { value: "OTHER", label: "Lainnya" },
 ];
+
+const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  SPAM: "Spam",
+  SCAM: "Penipuan",
+  PROHIBITED_ITEM: "Barang Terlarang",
+  MISLEADING: "Tidak Sesuai",
+  HARASSMENT: "Pelecehan",
+  OTHER: "Lainnya",
+};
 
 function formatPrice(price: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -121,11 +134,11 @@ export function Marketplace() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [themeReady, setThemeReady] = useState(false);
   const [banner, setBanner] = useState<BannerNotice | null>(null);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Auth & Session state
   const [accessToken, setAccessToken] = useState("");
   const [refreshToken, setRefreshToken] = useState("");
-  const [tokenInput, setTokenInput] = useState("");
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [devOtpHint, setDevOtpHint] = useState("");
@@ -151,20 +164,18 @@ export function Marketplace() {
     pages: 0,
   });
   const [categories, setCategories] = useState<Category[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
   const [referenceError, setReferenceError] = useState("");
   const [listError, setListError] = useState("");
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
 
-  // Selected listing modal & public profile modal
+  // Selected listing modal & public profile
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [detailError, setDetailError] = useState("");
   const [detailLoading, setDetailLoading] = useState(false);
   const detailRequest = useRef<AbortController | null>(null);
 
-  const [lookupUserId, setLookupUserId] = useState("");
   const [publicProfile, setPublicProfile] = useState<PublicProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState("");
@@ -190,13 +201,11 @@ export function Marketplace() {
   const [formRegionCode, setFormRegionCode] = useState("");
   const [formCondition, setFormCondition] = useState<Condition>("SECOND");
   const [formPhotoIds, setFormPhotoIds] = useState<string[]>([]);
-  const [manualPhotoIdInput, setManualPhotoIdInput] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [submittingListing, setSubmittingListing] = useState(false);
 
   // Mark sold & link buyer state
   const [soldBuyerInputs, setSoldBuyerInputs] = useState<Record<string, string>>({});
-  const [lastMarkSoldResult, setLastMarkSoldResult] = useState<MarkSoldData | null>(null);
 
   // Transactions & Rating state
   const [sales, setSales] = useState<SaleTransaction[]>([]);
@@ -247,7 +256,6 @@ export function Marketplace() {
     const savedRefresh = window.localStorage.getItem("aquaku-refresh-token") ?? "";
     if (savedAccess) {
       setAccessToken(savedAccess);
-      setTokenInput(savedAccess);
     }
     if (savedRefresh) {
       setRefreshToken(savedRefresh);
@@ -269,7 +277,6 @@ export function Marketplace() {
         type: formatted.isConflict ? "warning" : "error",
         title: formatted.title,
         message: formatted.message,
-        code: formatted.code,
       });
 
       if (formatted.isUnauthorized) {
@@ -284,26 +291,23 @@ export function Marketplace() {
   );
 
   // Load current user profile when accessToken changes
-  const fetchCurrentUser = useCallback(
-    async (tokenToUse: string) => {
-      if (!tokenToUse.trim()) {
+  const fetchCurrentUser = useCallback(async (tokenToUse: string) => {
+    if (!tokenToUse.trim()) {
+      setCurrentUser(null);
+      return;
+    }
+    setAuthLoading(true);
+    try {
+      const res = await apiGet<ApiEnvelope<UserProfile>>("/api/v1/users/me", { token: tokenToUse });
+      setCurrentUser(res.data);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
         setCurrentUser(null);
-        return;
       }
-      setAuthLoading(true);
-      try {
-        const res = await apiGet<ApiEnvelope<UserProfile>>("/api/v1/users/me", { token: tokenToUse });
-        setCurrentUser(res.data);
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 401) {
-          setCurrentUser(null);
-        }
-      } finally {
-        setAuthLoading(false);
-      }
-    },
-    [],
-  );
+    } finally {
+      setAuthLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (accessToken) {
@@ -329,12 +333,11 @@ export function Marketplace() {
       const errors: string[] = [];
       if (taxonomyResult.status === "fulfilled") {
         setCategories(taxonomyResult.value.data.categories);
-        setTags(taxonomyResult.value.data.tags);
         if (taxonomyResult.value.data.categories[0]) {
           setFormCategoryId((prev) => prev || taxonomyResult.value.data.categories[0].id);
         }
       } else {
-        errors.push(`Taksonomi kategori tidak tersedia: ${formatApiError(taxonomyResult.reason).message}`);
+        errors.push("Pilihan kategori belum tersedia.");
       }
 
       if (regionsResult.status === "fulfilled") {
@@ -343,7 +346,7 @@ export function Marketplace() {
           setFormRegionCode((prev) => prev || regionsResult.value.data[0].code);
         }
       } else {
-        errors.push(`Daftar wilayah tidak tersedia: ${formatApiError(regionsResult.reason).message}`);
+        errors.push("Pilihan wilayah belum tersedia.");
       }
 
       setReferenceError(errors.join(" "));
@@ -488,6 +491,18 @@ export function Marketplace() {
     [filters.districtCode, regions],
   );
 
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.category) count++;
+    if (filters.condition) count++;
+    if (filters.districtCode) count++;
+    if (filters.regionCode) count++;
+    if (filters.minPrice) count++;
+    if (filters.maxPrice) count++;
+    if (filters.sort !== "newest") count++;
+    return count;
+  }, [filters]);
+
   function updateFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((current) => ({ ...current, [key]: value }));
   }
@@ -496,12 +511,14 @@ export function Marketplace() {
     event.preventDefault();
     setPage(1);
     setAppliedFilters({ ...filters });
+    setShowMobileFilters(false);
   }
 
   function resetFilters() {
     setFilters(INITIAL_FILTERS);
     setAppliedFilters(INITIAL_FILTERS);
     setPage(1);
+    setShowMobileFilters(false);
   }
 
   async function openListing(listing: Listing) {
@@ -521,7 +538,7 @@ export function Marketplace() {
     } catch (error) {
       if (!controller.signal.aborted) {
         const formatted = formatApiError(error);
-        setDetailError(`${formatted.title}: ${formatted.message}`);
+        setDetailError(formatted.message);
       }
     } finally {
       if (!controller.signal.aborted) {
@@ -538,10 +555,8 @@ export function Marketplace() {
     setDetailLoading(false);
   }
 
-  // Public Profile Lookup (`GET /api/v1/users/{userId}`)
   async function openPublicProfile(userId: string) {
     if (!userId.trim()) return;
-    setLookupUserId(userId.trim());
     setProfileLoading(true);
     setProfileError("");
     try {
@@ -552,7 +567,7 @@ export function Marketplace() {
     } catch (error) {
       setPublicProfile(null);
       const formatted = formatApiError(error);
-      setProfileError(`${formatted.title}: ${formatted.message}`);
+      setProfileError(formatted.message);
     } finally {
       setProfileLoading(false);
     }
@@ -568,14 +583,13 @@ export function Marketplace() {
         body: { email: loginEmail.trim(), password: loginPassword },
       });
       setAccessToken(res.data.access_token);
-      setTokenInput(res.data.access_token);
       setRefreshToken(res.data.refresh_token);
       window.localStorage.setItem("aquaku-refresh-token", res.data.refresh_token);
       setCurrentUser(res.data.user);
       setBanner({
         type: "success",
-        title: "Login Berhasil",
-        message: `Selamat datang, ${res.data.user.display_name} (${res.data.user.role}).`,
+        title: "Berhasil masuk",
+        message: `Selamat datang kembali, ${res.data.user.display_name}.`,
       });
     } catch (error) {
       handleApiError(error);
@@ -605,10 +619,10 @@ export function Marketplace() {
       setLoginPassword(regPassword);
       setBanner({
         type: "success",
-        title: "Registrasi Berhasil",
+        title: "Pendaftaran berhasil",
         message: res.development_otp
-          ? `Akun dibuat. Silakan login lalu verifikasi HP dengan kode OTP development: ${res.development_otp}`
-          : "Akun dibuat. Silakan login dan verifikasi nomor HP Anda.",
+          ? `Silakan masuk lalu verifikasi nomor HP kamu dengan kode: ${res.development_otp}`
+          : "Akun berhasil dibuat. Silakan masuk dan verifikasi nomor HP kamu.",
       });
     } catch (error) {
       handleApiError(error);
@@ -629,8 +643,8 @@ export function Marketplace() {
       setCurrentUser(res.data);
       setBanner({
         type: "success",
-        title: "Nomor HP Terverifikasi",
-        message: "Akun Anda kini dapat membuat listing, melakukan konfirmasi transaksi, memberi rating, dan mengirim laporan.",
+        title: "Nomor HP terverifikasi",
+        message: "Akun kamu sudah aktif dan siap digunakan untuk jual beli.",
       });
     } catch (error) {
       handleApiError(error);
@@ -652,69 +666,32 @@ export function Marketplace() {
       }
       setBanner({
         type: "info",
-        title: "OTP Dikirim Ulang",
+        title: "Kode dikirim ulang",
         message: res.data?.development_otp
-          ? `Kode OTP development: ${res.data.development_otp}`
-          : "Kode OTP baru telah dikirim.",
+          ? `Kode verifikasi terbaru kamu: ${res.data.development_otp}`
+          : "Kode verifikasi baru telah dikirim ke nomor HP kamu.",
       });
     } catch (error) {
       handleApiError(error);
     } finally {
       setAuthLoading(false);
     }
-  }
-
-  async function handleRefreshToken() {
-    if (!refreshToken) return;
-    setAuthLoading(true);
-    try {
-      const res = await apiPost<ApiEnvelope<TokenPair>>("/api/v1/auth/refresh", {
-        body: { refresh_token: refreshToken },
-      });
-      setAccessToken(res.data.access_token);
-      setTokenInput(res.data.access_token);
-      setRefreshToken(res.data.refresh_token);
-      window.localStorage.setItem("aquaku-refresh-token", res.data.refresh_token);
-      setCurrentUser(res.data.user);
-      setBanner({
-        type: "success",
-        title: "Token Diperbarui",
-        message: "Access token baru berhasil diterbitkan.",
-      });
-    } catch (error) {
-      handleApiError(error);
-    } finally {
-      setAuthLoading(false);
-    }
-  }
-
-  function handleSaveManualToken(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const cleaned = tokenInput.trim().replace(/^Bearer\s+/i, "");
-    setAccessToken(cleaned);
-    setTokenInput(cleaned);
-    setBanner({
-      type: "info",
-      title: "Access Token Disimpan",
-      message: cleaned ? "Bearer token siap digunakan untuk request API." : "Access token telah dihapus (mode publik).",
-    });
   }
 
   function handleLogout() {
     setAccessToken("");
     setRefreshToken("");
-    setTokenInput("");
     setCurrentUser(null);
     window.localStorage.removeItem("aquaku-access-token");
     window.localStorage.removeItem("aquaku-refresh-token");
     setBanner({
       type: "info",
-      title: "Sesi Diakhiri",
-      message: "Anda sekarang mengakses marketplace sebagai pengunjung publik.",
+      title: "Berhasil keluar",
+      message: "Kamu telah keluar dari akun.",
     });
   }
 
-  // Photo Upload (Cloudinary signed upload + confirm-upload)
+  // Photo Upload
   async function handleFileUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file || !accessToken) return;
@@ -744,7 +721,7 @@ export function Marketplace() {
       });
 
       if (!cloudRes.ok) {
-        throw new Error(`Upload ke Cloudinary gagal (${cloudRes.status}).`);
+        throw new Error("Gagal mengunggah foto. Silakan coba lagi.");
       }
 
       await apiPost("/api/v1/marketplace/media/confirm-upload", {
@@ -755,8 +732,8 @@ export function Marketplace() {
       setFormPhotoIds((current) => [...current, sig.asset_id]);
       setBanner({
         type: "success",
-        title: "Foto Terverifikasi",
-        message: `Aset foto ${sig.asset_id} berhasil diunggah dan dikonfirmasi.`,
+        title: "Foto terunggah",
+        message: "Foto berhasil ditambahkan ke listing.",
       });
     } catch (error) {
       handleApiError(error);
@@ -776,24 +753,23 @@ export function Marketplace() {
       setFormPhotoIds((current) => current.filter((id) => id !== assetId));
       setBanner({
         type: "info",
-        title: "Foto Dihapus",
-        message: `Aset media ${assetId} dihapus.`,
+        title: "Foto dihapus",
+        message: "Foto telah dihapus dari daftar.",
       });
     } catch (error) {
-      // Remove from local array if not yet saved or error
       setFormPhotoIds((current) => current.filter((id) => id !== assetId));
       handleApiError(error);
     }
   }
 
-  // Create or Update Listing (`POST /marketplace/listings` or `PATCH /marketplace/listings/{listingId}`)
+  // Create or Update Listing
   async function handleSubmitListing(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!accessToken) {
       setBanner({
         type: "error",
-        title: "401 Unauthorized",
-        message: "Silakan login terlebih dahulu untuk membuat atau mengubah listing.",
+        title: "Silakan masuk",
+        message: "Masuk terlebih dahulu untuk memasang atau mengubah listing.",
       });
       setActiveTab("account");
       return;
@@ -803,8 +779,8 @@ export function Marketplace() {
     if (!Number.isFinite(parsedPrice) || parsedPrice < 1) {
       setBanner({
         type: "error",
-        title: "400 Bad Request",
-        message: "Harga harus berupa angka positif minimal Rp 1.",
+        title: "Harga belum sesuai",
+        message: "Masukkan harga minimal Rp 1.",
       });
       return;
     }
@@ -812,8 +788,8 @@ export function Marketplace() {
     if (formPhotoIds.length < 1) {
       setBanner({
         type: "error",
-        title: "400 Bad Request",
-        message: "Minimal 1 photo_id terverifikasi wajib disertakan.",
+        title: "Foto belum ada",
+        message: "Tambahkan minimal 1 foto produk.",
       });
       return;
     }
@@ -839,8 +815,8 @@ export function Marketplace() {
         );
         setBanner({
           type: "success",
-          title: "Listing Diperbarui",
-          message: `Listing "${res.data.title}" berhasil diperbarui.`,
+          title: "Perubahan disimpan",
+          message: `"${res.data.title}" berhasil diperbarui.`,
         });
       } else {
         const res = await apiPost<ApiEnvelope<Listing>>("/api/v1/marketplace/listings", {
@@ -857,8 +833,8 @@ export function Marketplace() {
         });
         setBanner({
           type: "success",
-          title: "Listing Dibuat",
-          message: `Listing "${res.data.title}" berhasil diterbitkan.`,
+          title: "Listing diterbitkan",
+          message: `"${res.data.title}" kini tampil di marketplace.`,
         });
       }
 
@@ -894,10 +870,9 @@ export function Marketplace() {
     setFormPrice("");
     setFormCondition("SECOND");
     setFormPhotoIds([]);
-    setManualPhotoIdInput("");
   }
 
-  // Mark Listing as Sold (`POST /api/v1/marketplace/listings/{listingId}/sold`)
+  // Mark Listing as Sold
   async function handleMarkSold(listingId: string) {
     if (!accessToken) return;
     const rawBuyerId = (soldBuyerInputs[listingId] ?? "").trim();
@@ -907,17 +882,15 @@ export function Marketplace() {
         `/api/v1/marketplace/listings/${encodeURIComponent(listingId)}/sold`,
         {
           token: accessToken,
-          // Sesuai docs.md 3.1: Body boleh tidak dikirim bila tanpa menghubungkan akun pembeli
           body: rawBuyerId ? { buyer_id: rawBuyerId } : undefined,
         },
       );
-      setLastMarkSoldResult(res.data);
       setBanner({
         type: "success",
-        title: "Listing Ditandai Terjual",
+        title: "Ditandai terjual",
         message: res.data.transaction
-          ? `Status: sold. Transaksi ${res.data.transaction.id} menunggu konfirmasi pembeli (${res.data.transaction.buyer_id}).`
-          : "Status: sold (transaction: null). Penjualan dicatat tanpa pembeli terhubung.",
+          ? "Menunggu konfirmasi dari pembeli."
+          : "Listing berhasil ditandai terjual.",
       });
       void loadMyListingsAndQuota();
       void loadTransactions();
@@ -930,15 +903,15 @@ export function Marketplace() {
     }
   }
 
-  // Link or Replace Buyer before confirmation (`POST /api/v1/marketplace/listings/{listingId}/sale`)
+  // Link or Replace Buyer before confirmation
   async function handleLinkOrReplaceBuyer(listingId: string, buyerIdInput?: string) {
     if (!accessToken) return;
     const buyerId = (buyerIdInput ?? replaceBuyerInputs[listingId] ?? soldBuyerInputs[listingId] ?? "").trim();
     if (!buyerId) {
       setBanner({
         type: "error",
-        title: "400 Bad Request",
-        message: "Masukkan UUID buyer_id dengan nomor HP terverifikasi.",
+        title: "ID Pembeli belum diisi",
+        message: "Masukkan ID akun pembeli terlebih dahulu.",
       });
       return;
     }
@@ -953,8 +926,8 @@ export function Marketplace() {
       );
       setBanner({
         type: "success",
-        title: "Pembeli Ditautkan / Diganti",
-        message: `Transaksi ${res.data.id} kini berstatus ${res.data.status} untuk pembeli ${res.data.buyer.display_name}.`,
+        title: "Pembeli dihubungkan",
+        message: `Menunggu konfirmasi dari ${res.data.buyer.display_name}.`,
       });
       void loadTransactions();
       void loadMyListingsAndQuota();
@@ -966,19 +939,19 @@ export function Marketplace() {
     }
   }
 
-  // Cancel Awaiting Sale (`DELETE /api/v1/marketplace/sales/{saleId}`)
+  // Cancel Awaiting Sale
   async function handleCancelSale(saleId: string) {
     if (!accessToken) return;
     setBanner(null);
     try {
-      const res = await apiDelete<ApiEnvelope<SaleTransaction>>(
+      await apiDelete<ApiEnvelope<SaleTransaction>>(
         `/api/v1/marketplace/sales/${encodeURIComponent(saleId)}`,
         { token: accessToken },
       );
       setBanner({
         type: "info",
-        title: "Tautan Transaksi Dibatalkan",
-        message: `Transaksi ${res.data.id} dibatalkan (${res.data.status}). Listing tetap berstatus Sold.`,
+        title: "Transaksi dibatalkan",
+        message: "Tautan pembeli pada penjualan ini telah dibatalkan.",
       });
       void loadTransactions();
       void loadMyListingsAndQuota();
@@ -989,13 +962,13 @@ export function Marketplace() {
     }
   }
 
-  // Buyer Respond to Transaction (`POST /api/v1/marketplace/sales/{saleId}/respond`)
+  // Buyer Respond to Transaction
   async function handleRespondSale(saleId: string, decision: BuyerDecision) {
     if (!accessToken) return;
     const note = (respondNotes[saleId] ?? "").trim();
     setBanner(null);
     try {
-      const res = await apiPost<ApiEnvelope<SaleTransaction>>(
+      await apiPost<ApiEnvelope<SaleTransaction>>(
         `/api/v1/marketplace/sales/${encodeURIComponent(saleId)}/respond`,
         {
           token: accessToken,
@@ -1004,8 +977,11 @@ export function Marketplace() {
       );
       setBanner({
         type: "success",
-        title: decision === "CONFIRM" ? "Transaksi Dikonfirmasi" : "Transaksi Ditolak",
-        message: `Status transaksi kini: ${res.data.status}.`,
+        title: decision === "CONFIRM" ? "Pembelian dikonfirmasi" : "Pembelian ditolak",
+        message:
+          decision === "CONFIRM"
+            ? "Terima kasih! Kamu sekarang dapat memberikan penilaian untuk penjual."
+            : "Transaksi telah ditolak.",
       });
       void loadTransactions();
     } catch (error) {
@@ -1015,7 +991,7 @@ export function Marketplace() {
     }
   }
 
-  // Buyer Submit Rating (`POST /api/v1/marketplace/sales/{saleId}/rating`)
+  // Buyer Submit Rating
   async function handleRateSale(saleId: string) {
     if (!accessToken) return;
     const score = ratingScores[saleId] ?? 5;
@@ -1030,8 +1006,8 @@ export function Marketplace() {
       );
       setBanner({
         type: "success",
-        title: "Rating Tersimpan",
-        message: `Rating ${res.data.score}/5 berhasil dicatat untuk transaksi ini.`,
+        title: "Ulasan tersimpan",
+        message: `Terima kasih telah memberikan penilaian ★ ${res.data.score}/5.`,
       });
       void loadTransactions();
     } catch (error) {
@@ -1048,7 +1024,7 @@ export function Marketplace() {
       await apiPost(`/api/v1/marketplace/listings/${encodeURIComponent(listingId)}/renew`, {
         token: accessToken,
       });
-      setBanner({ type: "success", title: "Listing Diperpanjang", message: "Listing aktif kembali." });
+      setBanner({ type: "success", title: "Listing diperpanjang", message: "Listing kembali aktif." });
       void loadMyListingsAndQuota();
       setReload((c) => c + 1);
     } catch (error) {
@@ -1062,7 +1038,7 @@ export function Marketplace() {
       await apiPost(`/api/v1/marketplace/listings/${encodeURIComponent(listingId)}/reactivate`, {
         token: accessToken,
       });
-      setBanner({ type: "success", title: "Listing Diaktifkan Kembali", message: "Listing kembali aktif." });
+      setBanner({ type: "success", title: "Listing diaktifkan", message: "Listing kembali tampil di marketplace." });
       void loadMyListingsAndQuota();
       setReload((c) => c + 1);
     } catch (error) {
@@ -1076,7 +1052,7 @@ export function Marketplace() {
       await apiDelete(`/api/v1/marketplace/listings/${encodeURIComponent(listingId)}`, {
         token: accessToken,
       });
-      setBanner({ type: "info", title: "Listing Diarsipkan", message: "Listing telah dihapus (soft delete)." });
+      setBanner({ type: "info", title: "Listing dihapus", message: "Listing telah dihapus dari daftar aktif." });
       void loadMyListingsAndQuota();
       setReload((c) => c + 1);
     } catch (error) {
@@ -1084,14 +1060,14 @@ export function Marketplace() {
     }
   }
 
-  // Create Report (`POST /api/v1/marketplace/reports`)
+  // Create Report
   async function handleCreateReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!accessToken) {
       setBanner({
         type: "error",
-        title: "401 Unauthorized",
-        message: "Silakan login dengan akun terverifikasi untuk membuat laporan.",
+        title: "Silakan masuk",
+        message: "Masuk terlebih dahulu untuk mengirim laporan.",
       });
       setActiveTab("account");
       return;
@@ -1099,7 +1075,7 @@ export function Marketplace() {
     setSubmittingReport(true);
     setBanner(null);
     try {
-      const res = await apiPost<ApiEnvelope<Report>>("/api/v1/marketplace/reports", {
+      await apiPost<ApiEnvelope<Report>>("/api/v1/marketplace/reports", {
         token: accessToken,
         body: {
           target_type: reportTargetType,
@@ -1110,8 +1086,8 @@ export function Marketplace() {
       });
       setBanner({
         type: "success",
-        title: "Laporan Terkirim",
-        message: `Laporan ${res.data.id} berstatus "${res.data.status}" dan masuk antrean admin.`,
+        title: "Laporan terkirim",
+        message: "Terima kasih, laporan kamu sedang kami tinjau.",
       });
       setReportDetails("");
       void loadMyReports();
@@ -1131,21 +1107,21 @@ export function Marketplace() {
     setActiveTab("reports");
   }
 
-  // Admin: Review Report (`POST /api/v1/marketplace/admin/reports/{reportId}/review`)
+  // Admin: Review Report
   async function handleAdminReviewReport(reportId: string) {
     const decision = adminReviewDecision[reportId] ?? "RESOLVED";
     const reviewNote = (adminReviewNotes[reportId] ?? "").trim();
     if (!reviewNote) {
       setBanner({
         type: "error",
-        title: "400 Bad Request",
-        message: "Catatan review (review_note) wajib diisi saat meninjau laporan.",
+        title: "Catatan wajib diisi",
+        message: "Tuliskan catatan hasil tinjauan sebelum menyimpan keputusan.",
       });
       return;
     }
     setBanner(null);
     try {
-      const res = await apiPost<ApiEnvelope<Report>>(
+      await apiPost<ApiEnvelope<Report>>(
         `/api/v1/marketplace/admin/reports/${encodeURIComponent(reportId)}/review`,
         {
           token: accessToken,
@@ -1154,8 +1130,8 @@ export function Marketplace() {
       );
       setBanner({
         type: "success",
-        title: "Laporan Ditinjau",
-        message: `Laporan ${res.data.id} diperbarui menjadi "${res.data.status}".`,
+        title: "Laporan selesai ditinjau",
+        message: "Status laporan berhasil diperbarui.",
       });
       void loadAdminReports();
     } catch (error) {
@@ -1165,7 +1141,7 @@ export function Marketplace() {
     }
   }
 
-  // Admin: Listing Moderation (`GET` & `POST /api/v1/marketplace/admin/listings/{listingId}/moderation`)
+  // Admin: Listing Moderation
   async function handleLoadModerationHistory(listingIdToLoad?: string) {
     const targetId = (listingIdToLoad ?? modListingId).trim();
     if (!targetId) return;
@@ -1189,8 +1165,8 @@ export function Marketplace() {
     if (!targetId || !modReason.trim()) {
       setBanner({
         type: "error",
-        title: "400 Bad Request",
-        message: "Listing ID dan alasan moderasi (reason) wajib diisi.",
+        title: "Data belum lengkap",
+        message: "ID listing dan alasan moderasi wajib diisi.",
       });
       return;
     }
@@ -1208,8 +1184,11 @@ export function Marketplace() {
       setModReason("");
       setBanner({
         type: "success",
-        title: modAction === "HIDE" ? "Listing Disembunyikan" : "Listing Dipulihkan",
-        message: `Listing ${res.data.id} sekarang hidden=${String(res.data.hidden)}.`,
+        title: modAction === "HIDE" ? "Listing disembunyikan" : "Listing dipulihkan",
+        message:
+          modAction === "HIDE"
+            ? "Listing telah disembunyikan dari halaman publik."
+            : "Listing kembali ditampilkan ke publik.",
       });
       await handleLoadModerationHistory(targetId);
       setReload((c) => c + 1);
@@ -1222,7 +1201,7 @@ export function Marketplace() {
     }
   }
 
-  // Admin: Buyer Correction (`POST /api/v1/marketplace/admin/sales/{saleId}/correct-buyer` & `GET .../corrections`)
+  // Admin: Buyer Correction
   async function handleLoadSaleCorrections(saleIdToLoad?: string) {
     const targetSaleId = (saleIdToLoad ?? correctSaleId).trim();
     if (!targetSaleId) return;
@@ -1246,8 +1225,8 @@ export function Marketplace() {
     if (!targetSaleId || !correctBuyerId.trim() || !correctReason.trim()) {
       setBanner({
         type: "error",
-        title: "400 Bad Request",
-        message: "Sale ID, Buyer ID baru, dan alasan koreksi wajib diisi.",
+        title: "Data belum lengkap",
+        message: "ID transaksi, ID pembeli baru, dan alasan koreksi wajib diisi.",
       });
       return;
     }
@@ -1267,8 +1246,8 @@ export function Marketplace() {
       setCorrectReason("");
       setBanner({
         type: "success",
-        title: "Pembeli Dikoreksi",
-        message: `Rating lama dihapus dan transaksi ${res.data.id} kembali ke status "${res.data.status}" untuk pembeli ${res.data.buyer.display_name}.`,
+        title: "Pembeli diperbarui",
+        message: `Transaksi kini menunggu konfirmasi dari ${res.data.buyer.display_name}.`,
       });
       await handleLoadSaleCorrections(targetSaleId);
     } catch (error) {
@@ -1279,6 +1258,8 @@ export function Marketplace() {
       setCorrectionsLoading(false);
     }
   }
+
+  const isAdmin = currentUser?.role === "admin";
 
   return (
     <div className="app-shell">
@@ -1296,7 +1277,7 @@ export function Marketplace() {
             <img src="/icon.jpeg" alt="" width="40" height="40" />
           </span>
           <span className="brand-copy">
-            Aquaku<small>marketplace aquascape</small>
+            Aquaku<small>aquascape semarang</small>
           </span>
         </a>
 
@@ -1315,7 +1296,7 @@ export function Marketplace() {
             onClick={() => setActiveTab("my-listings")}
           >
             <Icon name="box" />
-            <span>Listing Saya</span>
+            <span>Lapakku</span>
           </button>
           <button
             type="button"
@@ -1323,7 +1304,7 @@ export function Marketplace() {
             onClick={() => setActiveTab("transactions")}
           >
             <Icon name="swap" />
-            <span>Transaksi & Rating</span>
+            <span>Transaksi</span>
           </button>
           <button
             type="button"
@@ -1331,23 +1312,25 @@ export function Marketplace() {
             onClick={() => setActiveTab("reports")}
           >
             <Icon name="flag" />
-            <span>Laporan</span>
+            <span>Bantuan</span>
           </button>
-          <button
-            type="button"
-            className={`nav-link ${activeTab === "admin" ? "active" : ""}`}
-            onClick={() => setActiveTab("admin")}
-          >
-            <Icon name="shield" />
-            <span>Admin</span>
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              className={`nav-link ${activeTab === "admin" ? "active" : ""}`}
+              onClick={() => setActiveTab("admin")}
+            >
+              <Icon name="shield" />
+              <span>Admin</span>
+            </button>
+          )}
           <button
             type="button"
             className={`nav-link ${activeTab === "account" ? "active" : ""}`}
             onClick={() => setActiveTab("account")}
           >
             <Icon name="user" />
-            <span>{currentUser ? currentUser.display_name : "Akun / Token"}</span>
+            <span>{currentUser ? currentUser.display_name : "Akun"}</span>
           </button>
         </nav>
 
@@ -1357,26 +1340,24 @@ export function Marketplace() {
               type="button"
               className="user-badge-btn"
               onClick={() => setActiveTab("account")}
-              title={`ID: ${currentUser.id}`}
             >
               <span className={`status-dot ${currentUser.phone_verified ? "verified" : "unverified"}`} />
-              <span>{currentUser.display_name}</span>
-              <small className="role-chip">{currentUser.role}</small>
+              <span className="user-badge-name">{currentUser.display_name}</span>
             </button>
           ) : (
             <button type="button" className="button-secondary compact-btn" onClick={() => setActiveTab("account")}>
-              Login / Token
+              Masuk
             </button>
           )}
           <button
             className="theme-toggle"
             type="button"
-            aria-label={theme === "dark" ? "Aktifkan mode terang" : "Aktifkan mode gelap"}
+            aria-label={theme === "dark" ? "Mode terang" : "Mode gelap"}
             aria-pressed={theme === "dark"}
             onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
           >
             <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
-            <span className="theme-label">Mode</span>
+            <span className="theme-label">{theme === "dark" ? "Terang" : "Gelap"}</span>
           </button>
           <span className="location-pill">
             <Icon name="pin" /> Semarang
@@ -1388,10 +1369,7 @@ export function Marketplace() {
         {banner && (
           <div className={`alert-banner ${banner.type}`} role="alert">
             <div>
-              <strong>
-                {banner.title}
-                {banner.code ? ` (${banner.code})` : ""}
-              </strong>
+              <strong>{banner.title}</strong>
               <p>{banner.message}</p>
             </div>
             <button type="button" className="banner-close" onClick={() => setBanner(null)} aria-label="Tutup pesan">
@@ -1402,244 +1380,241 @@ export function Marketplace() {
 
         {currentUser && !currentUser.phone_verified && (
           <div className="notice warning" role="status">
-            <strong>Nomor HP belum terverifikasi.</strong> Tindakan membuat listing, mencatat/merespons transaksi,
-            memberi rating, dan mengirim laporan memerlukan verifikasi OTP di tab{" "}
+            <strong>Nomor HP kamu belum terverifikasi.</strong> Verifikasi diperlukan untuk memasang iklan, bertransaksi,
+            dan memberi ulasan.{" "}
             <button type="button" className="inline-link" onClick={() => setActiveTab("account")}>
-              Akun / Token
+              Verifikasi sekarang
             </button>
-            .
           </div>
         )}
 
-        {/* ==================== TAB 1: JELAJAH & PROFIL PUBLIK ==================== */}
+        {/* ==================== TAB 1: JELAJAH ==================== */}
         {activeTab === "explore" && (
           <>
             <section className="intro">
               <div>
-                <p className="eyebrow">Jual beli lokal, tumbuh bareng</p>
+                <p className="eyebrow">Komunitas Aquascape Semarang</p>
                 <h1>Temukan isi tank-mu</h1>
                 <p className="subtitle">
-                  Tanaman, fauna, dan perlengkapan aquascape dari sekitar Kota Semarang. Tanpa komisi transaksi.
+                  Tanaman, fauna, dan perlengkapan aquascape pilihan dari penghobi dan toko di sekitar Semarang.
                 </p>
               </div>
               <div className="local-note">
-                <span className="online-dot" /> Listing aktif di Semarang
+                <span className="online-dot" /> Transaksi langsung dengan penjual
               </div>
             </section>
 
             <form className="filter-panel" onSubmit={applyFilters}>
-              <label className="search-field">
-                <Icon name="search" />
-                <input
-                  type="search"
-                  maxLength={100}
-                  placeholder="Cari tanaman, alat, atau toko..."
-                  value={filters.q}
-                  onChange={(event) => updateFilter("q", event.target.value)}
-                />
-              </label>
-
-              <div className="filter-grid">
-                <label className="field">
-                  <span>Kategori</span>
-                  <select value={filters.category} onChange={(event) => updateFilter("category", event.target.value)}>
-                    <option value="">Semua kategori</option>
-                    {categories.map((category) => (
-                      <option key={category.id} value={category.slug}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Kondisi</span>
-                  <select value={filters.condition} onChange={(event) => updateFilter("condition", event.target.value)}>
-                    <option value="">Semua kondisi</option>
-                    <option value="BNIB">BNIB</option>
-                    <option value="NEW">New</option>
-                    <option value="LIKE_NEW">Like New</option>
-                    <option value="SECOND">Second</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Kecamatan</span>
-                  <select
-                    value={filters.districtCode}
-                    onChange={(event) => {
-                      updateFilter("districtCode", event.target.value);
-                      updateFilter("regionCode", "");
-                    }}
-                  >
-                    <option value="">Semua kecamatan</option>
-                    {districts.map(([code, name]) => (
-                      <option key={code} value={code}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Kelurahan</span>
-                  <select
-                    value={filters.regionCode}
-                    onChange={(event) => updateFilter("regionCode", event.target.value)}
-                    disabled={!regions.length}
-                  >
-                    <option value="">Semua kelurahan</option>
-                    {visibleRegions.map((region) => (
-                      <option key={region.code} value={region.code}>
-                        {region.kelurahan}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Harga minimum</span>
+              <div className="search-bar-row">
+                <label className="search-field">
+                  <Icon name="search" />
                   <input
-                    type="number"
-                    min="1"
-                    placeholder="Rp minimum"
-                    value={filters.minPrice}
-                    onChange={(event) => updateFilter("minPrice", event.target.value)}
+                    type="search"
+                    maxLength={100}
+                    placeholder="Cari tanaman, lampu, filter, atau toko..."
+                    value={filters.q}
+                    onChange={(event) => updateFilter("q", event.target.value)}
                   />
                 </label>
-                <label className="field">
-                  <span>Harga maksimum</span>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Rp maksimum"
-                    value={filters.maxPrice}
-                    onChange={(event) => updateFilter("maxPrice", event.target.value)}
-                  />
-                </label>
-                <label className="field">
-                  <span>Urutkan</span>
-                  <select
-                    value={filters.sort}
-                    onChange={(event) => updateFilter("sort", event.target.value as Filters["sort"])}
-                  >
-                    <option value="newest">Terbaru</option>
-                    <option value="price_asc">Harga terendah</option>
-                    <option value="price_desc">Harga tertinggi</option>
-                  </select>
-                </label>
+                <button
+                  type="button"
+                  className="button-secondary mobile-filter-toggle"
+                  onClick={() => setShowMobileFilters((v) => !v)}
+                  aria-expanded={showMobileFilters}
+                >
+                  Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+                </button>
               </div>
 
-              <div className="filter-actions">
-                <button type="button" className="button-secondary" onClick={resetFilters}>
-                  Reset filter
-                </button>
-                <button type="submit" className="button-primary">
-                  <Icon name="search" /> Tampilkan hasil
-                </button>
+              <div className={`filter-collapsible ${showMobileFilters ? "open" : ""}`}>
+                <div className="filter-grid">
+                  <label className="field">
+                    <span>Kategori</span>
+                    <select value={filters.category} onChange={(event) => updateFilter("category", event.target.value)}>
+                      <option value="">Semua kategori</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.slug}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Kondisi</span>
+                    <select value={filters.condition} onChange={(event) => updateFilter("condition", event.target.value)}>
+                      <option value="">Semua kondisi</option>
+                      <option value="BNIB">BNIB</option>
+                      <option value="NEW">Baru</option>
+                      <option value="LIKE_NEW">Seperti Baru</option>
+                      <option value="SECOND">Bekas</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Kecamatan</span>
+                    <select
+                      value={filters.districtCode}
+                      onChange={(event) => {
+                        updateFilter("districtCode", event.target.value);
+                        updateFilter("regionCode", "");
+                      }}
+                    >
+                      <option value="">Semua kecamatan</option>
+                      {districts.map(([code, name]) => (
+                        <option key={code} value={code}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Kelurahan</span>
+                    <select
+                      value={filters.regionCode}
+                      onChange={(event) => updateFilter("regionCode", event.target.value)}
+                      disabled={!regions.length}
+                    >
+                      <option value="">Semua kelurahan</option>
+                      {visibleRegions.map((region) => (
+                        <option key={region.code} value={region.code}>
+                          {region.kelurahan}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Harga minimum</span>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Rp min"
+                      value={filters.minPrice}
+                      onChange={(event) => updateFilter("minPrice", event.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Harga maksimum</span>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="Rp maks"
+                      value={filters.maxPrice}
+                      onChange={(event) => updateFilter("maxPrice", event.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Urutkan</span>
+                    <select
+                      value={filters.sort}
+                      onChange={(event) => updateFilter("sort", event.target.value as Filters["sort"])}
+                    >
+                      <option value="newest">Terbaru</option>
+                      <option value="price_asc">Harga terendah</option>
+                      <option value="price_desc">Harga tertinggi</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="filter-actions">
+                  <button type="button" className="button-secondary" onClick={resetFilters}>
+                    Atur ulang
+                  </button>
+                  <button type="submit" className="button-primary">
+                    <Icon name="search" /> Terapkan
+                  </button>
+                </div>
               </div>
             </form>
 
-            {/* Panel Cek Profil Publik Penjual / Pengguna */}
-            <section className="section-card compact-card">
-              <div className="card-header-inline">
-                <div>
-                  <h3>Profil Publik & Ringkasan Rating Penjual (`GET /users/&#123;userId&#125;`)</h3>
-                  <p className="muted-text">
-                    Dapat diakses publik tanpa login. Klik nama penjual pada listing atau masukkan UUID pengguna.
-                  </p>
-                </div>
-                <form
-                  className="inline-form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void openPublicProfile(lookupUserId);
-                  }}
-                >
-                  <input
-                    type="text"
-                    placeholder="Masukkan User UUID..."
-                    value={lookupUserId}
-                    onChange={(e) => setLookupUserId(e.target.value)}
-                  />
-                  <button type="submit" className="button-secondary" disabled={profileLoading}>
-                    {profileLoading ? "Memuat..." : "Lihat Profil"}
-                  </button>
-                </form>
-              </div>
-
-              {profileError && <p className="error-text">{profileError}</p>}
-
-              {publicProfile && (
-                <div className="profile-summary-box">
-                  <div className="profile-summary-main">
-                    <div>
-                      <strong>{publicProfile.display_name}</strong>{" "}
-                      <span className="condition-tag">{publicProfile.tier.toUpperCase()}</span>{" "}
-                      {publicProfile.verified_store && <span className="verified-tag">✓ Toko Terverifikasi</span>}
-                      <p className="muted-text">UUID: {publicProfile.id}</p>
-                      {publicProfile.bio && <p className="profile-bio">{publicProfile.bio}</p>}
-                    </div>
-                    <div className="profile-stats">
-                      <div className="stat-item">
-                        <small>Rating Rata-rata</small>
-                        <strong>
-                          {publicProfile.rating_average !== null ? `★ ${publicProfile.rating_average.toFixed(2)}` : "Belum ada"}
-                        </strong>
-                      </div>
-                      <div className="stat-item">
-                        <small>Jumlah Rating</small>
-                        <strong>{publicProfile.rating_count} ulasan</strong>
-                      </div>
-                      <div className="stat-item">
-                        <small>Listing Aktif</small>
-                        <strong>{publicProfile.active_listing_count}</strong>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="action-row">
-                    <button
-                      type="button"
-                      className="button-secondary"
-                      onClick={() => prefillReport("USER", publicProfile.id)}
-                    >
-                      Laporkan Pengguna Ini
-                    </button>
-                    <button type="button" className="button-secondary" onClick={() => setPublicProfile(null)}>
-                      Tutup Profil
+            {/* Profil Penjual (Tampil saat pengguna memilih profil penjual) */}
+            {(profileLoading || profileError || publicProfile) && (
+              <section className="section-card compact-card">
+                {profileLoading ? (
+                  <p className="muted-text">Memuat profil penjual...</p>
+                ) : profileError ? (
+                  <div className="card-header-inline">
+                    <p className="error-text">{profileError}</p>
+                    <button type="button" className="button-secondary" onClick={() => setProfileError("")}>
+                      Tutup
                     </button>
                   </div>
-                </div>
-              )}
-            </section>
+                ) : publicProfile ? (
+                  <div className="profile-summary-box">
+                    <div className="profile-summary-main">
+                      <div>
+                        <div className="listing-tags">
+                          <strong>{publicProfile.display_name}</strong>
+                          <span className="condition-tag">{publicProfile.tier.toUpperCase()}</span>
+                          {publicProfile.verified_store && <span className="verified-tag">✓ Toko Terverifikasi</span>}
+                        </div>
+                        {publicProfile.bio && <p className="profile-bio">{publicProfile.bio}</p>}
+                      </div>
+                      <div className="profile-stats">
+                        <div className="stat-item">
+                          <small>Penilaian</small>
+                          <strong>
+                            {publicProfile.rating_average !== null ? `★ ${publicProfile.rating_average.toFixed(1)}` : "Belum ada"}
+                          </strong>
+                        </div>
+                        <div className="stat-item">
+                          <small>Ulasan</small>
+                          <strong>{publicProfile.rating_count}</strong>
+                        </div>
+                        <div className="stat-item">
+                          <small>Iklan Aktif</small>
+                          <strong>{publicProfile.active_listing_count}</strong>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="action-row">
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        onClick={() => prefillReport("USER", publicProfile.id)}
+                      >
+                        Laporkan Penjual
+                      </button>
+                      <button type="button" className="button-secondary" onClick={() => setPublicProfile(null)}>
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+            )}
 
             {referenceError && (
               <p className="notice warning" role="status">
-                {referenceError} Filter terkait mungkin belum tersedia.
+                {referenceError}
               </p>
             )}
 
             <div className="results-heading">
               <div>
-                <h2>Listing sekitar Semarang</h2>
-                <p>{loading ? "Memuat listing..." : `${pagination.total} listing aktif ditemukan`}</p>
+                <h2>Pilihan di Semarang</h2>
+                <p>{loading ? "Mencari produk..." : `${pagination.total} produk tersedia`}</p>
               </div>
-              <span className="result-page">
-                {pagination.pages > 0 ? `Halaman ${pagination.page} dari ${pagination.pages}` : "Tanpa komisi transaksi"}
-              </span>
+              {pagination.pages > 1 && (
+                <span className="result-page">
+                  Hal. {pagination.page} / {pagination.pages}
+                </span>
+              )}
             </div>
 
             {listError ? (
               <div className="error-state" role="alert">
                 <span className="error-icon">!</span>
-                <h3>Listing belum dapat dimuat</h3>
+                <h3>Produk belum dapat ditampilkan</h3>
                 <p>{listError}</p>
                 <button
                   className="button-secondary"
                   type="button"
                   onClick={() => setReload((current) => current + 1)}
                 >
-                  Coba lagi
+                  Muat ulang
                 </button>
               </div>
             ) : loading ? (
-              <div className="listing-grid" aria-label="Memuat listing">
+              <div className="listing-grid" aria-label="Memuat produk">
                 {Array.from({ length: 6 }, (_, index) => (
                   <div className="skeleton-card" key={index}>
                     <div />
@@ -1657,16 +1632,16 @@ export function Marketplace() {
             ) : (
               <div className="empty-state">
                 <span>🪴</span>
-                <h3>Belum ada listing yang cocok</h3>
-                <p>Coba ubah kata kunci atau filter pencarianmu.</p>
+                <h3>Belum ada produk yang cocok</h3>
+                <p>Coba gunakan kata kunci lain atau atur ulang filter pencarian.</p>
                 <button className="button-secondary" type="button" onClick={resetFilters}>
-                  Hapus semua filter
+                  Lihat semua produk
                 </button>
               </div>
             )}
 
             {!listError && pagination.pages > 1 && (
-              <nav className="pagination" aria-label="Halaman listing">
+              <nav className="pagination" aria-label="Halaman produk">
                 <button
                   type="button"
                   className="button-secondary"
@@ -1691,36 +1666,30 @@ export function Marketplace() {
           </>
         )}
 
-        {/* ==================== TAB 2: LISTING SAYA & BUAT/EDIT LISTING ==================== */}
+        {/* ==================== TAB 2: LAPAKKU (LISTING SAYA) ==================== */}
         {activeTab === "my-listings" && (
           <div className="stack-layout">
             <section className="section-card">
               <div className="card-header-inline">
                 <div>
-                  <h2>{editingListingId ? `Ubah Listing (${editingListingId})` : "Buat Listing Baru"}</h2>
+                  <h2>{editingListingId ? "Ubah Iklan" : "Pasang Iklan Baru"}</h2>
                   <p className="muted-text">
-                    Endpoint: <code>{editingListingId ? "PATCH /marketplace/listings/{listingId}" : "POST /marketplace/listings"}</code> (Wajib Login & HP Terverifikasi)
+                    Lengkapi foto dan detail produk aquascape yang ingin kamu tawarkan.
                   </p>
                 </div>
                 {quota && (
                   <div className="quota-pills">
-                    <span className="condition-tag">Tier: {quota.tier.toUpperCase()}</span>
+                    <span className="condition-tag">{quota.tier.toUpperCase()}</span>
                     <span className="verified-tag">
-                      Slot Tersedia: {quota.available_slots} / {quota.total_quota} (Aktif: {quota.active_listings})
+                      Sisa kuota: {quota.available_slots} dari {quota.total_quota}
                     </span>
                   </div>
                 )}
               </div>
 
-              {tags.length > 0 && (
-                <p className="muted-text small-note">
-                  Ketentuan Kondisi: {tags.map((t) => `${t.name} (min. ${t.minimum_tier})`).join(" · ")}
-                </p>
-              )}
-
               <form className="form-grid" onSubmit={handleSubmitListing}>
                 <label className="field span-2">
-                  <span>Judul Listing (5–120 karakter)</span>
+                  <span>Nama Produk</span>
                   <input
                     type="text"
                     required
@@ -1749,65 +1718,65 @@ export function Marketplace() {
                 </label>
 
                 <label className="field">
-                  <span>Kelurahan (Kota Semarang)</span>
+                  <span>Lokasi Kelurahan</span>
                   <select
                     required
                     value={formRegionCode}
                     onChange={(e) => setFormRegionCode(e.target.value)}
                   >
-                    <option value="">Pilih kelurahan</option>
+                    <option value="">Pilih lokasi</option>
                     {regions.map((reg) => (
                       <option key={reg.code} value={reg.code}>
-                        {reg.district} — {reg.kelurahan} ({reg.code})
+                        {reg.district} — {reg.kelurahan}
                       </option>
                     ))}
                   </select>
                 </label>
 
                 <label className="field">
-                  <span>Harga (IDR)</span>
+                  <span>Harga (Rp)</span>
                   <input
                     type="number"
                     required
                     min={1}
-                    placeholder="Contoh: 75000"
+                    placeholder="Contoh: 50000"
                     value={formPrice}
                     onChange={(e) => setFormPrice(e.target.value)}
                   />
                 </label>
 
                 <label className="field">
-                  <span>Kondisi (`Condition`)</span>
+                  <span>Kondisi Barang</span>
                   <select
                     value={formCondition}
                     onChange={(e) => setFormCondition(e.target.value as Condition)}
                   >
-                    <option value="SECOND">SECOND</option>
-                    <option value="LIKE_NEW">LIKE_NEW</option>
-                    <option value="NEW">NEW</option>
+                    <option value="SECOND">Bekas</option>
+                    <option value="LIKE_NEW">Seperti Baru</option>
+                    <option value="NEW">Baru</option>
                     <option value="BNIB">BNIB</option>
                   </select>
                 </label>
 
                 <label className="field span-2">
-                  <span>Deskripsi (10–5000 karakter)</span>
+                  <span>Deskripsi Produk</span>
                   <textarea
                     required
                     minLength={10}
                     maxLength={5000}
                     rows={4}
-                    placeholder="Jelaskan kondisi tanaman/fauna/alat, ukuran, dan lokasi COD..."
+                    placeholder="Ceritakan kondisi barang, ukuran, kelengkapan, dan lokasi COD..."
                     value={formDesc}
                     onChange={(e) => setFormDesc(e.target.value)}
                   />
                 </label>
 
                 <div className="field span-2">
-                  <span>Foto Terverifikasi (`photo_ids` — 1 s/d 8 foto)</span>
+                  <span>Foto Produk (Maks. 8 foto)</span>
                   <div className="photo-upload-box">
                     <div className="inline-form">
                       <label className="button-secondary file-label">
-                        {uploadingPhoto ? "Mengunggah ke Cloudinary..." : "Unggah Foto (Cloudinary)"}
+                        {uploadingPhoto ? "Mengunggah foto..." : "+ Tambah Foto"}
                         <input
                           type="file"
                           accept="image/jpeg,image/png,image/webp"
@@ -1816,35 +1785,16 @@ export function Marketplace() {
                           hidden
                         />
                       </label>
-                      <input
-                        type="text"
-                        placeholder="Atau tambah UUID asset_id terverifikasi..."
-                        value={manualPhotoIdInput}
-                        onChange={(e) => setManualPhotoIdInput(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="button-secondary"
-                        onClick={() => {
-                          const trimmed = manualPhotoIdInput.trim();
-                          if (trimmed && !formPhotoIds.includes(trimmed)) {
-                            setFormPhotoIds((curr) => [...curr, trimmed]);
-                            setManualPhotoIdInput("");
-                          }
-                        }}
-                      >
-                        Tambah ID
-                      </button>
                     </div>
                     {formPhotoIds.length > 0 ? (
                       <div className="chip-list">
-                        {formPhotoIds.map((id) => (
+                        {formPhotoIds.map((id, idx) => (
                           <span key={id} className="asset-chip">
-                            <code>{id}</code>
+                            <span>Foto {idx + 1}</span>
                             <button
                               type="button"
                               onClick={() => void handleRemovePhotoAsset(id)}
-                              title="Hapus aset foto"
+                              title="Hapus foto"
                             >
                               ×
                             </button>
@@ -1853,7 +1803,7 @@ export function Marketplace() {
                       </div>
                     ) : (
                       <small className="muted-text">
-                        Belum ada foto. Unggah melalui signed upload Cloudinary (mengembalikan 503 bila kredensial Cloudinary belum diset) atau masukkan UUID aset terverifikasi.
+                        Tambahkan minimal 1 foto produk yang jelas.
                       </small>
                     )}
                   </div>
@@ -1862,67 +1812,48 @@ export function Marketplace() {
                 <div className="filter-actions span-2">
                   {editingListingId && (
                     <button type="button" className="button-secondary" onClick={resetListingForm}>
-                      Batal Edit
+                      Batal
                     </button>
                   )}
                   <button type="submit" className="button-primary" disabled={submittingListing}>
                     {submittingListing
                       ? "Menyimpan..."
                       : editingListingId
-                        ? "Simpan Perubahan Listing"
-                        : "Terbitkan Listing"}
+                        ? "Simpan Perubahan"
+                        : "Tayangkan Iklan"}
                   </button>
                 </div>
               </form>
             </section>
 
-            {lastMarkSoldResult && (
-              <section className="section-card compact-card">
-                <div className="card-header-inline">
-                  <div>
-                    <h3>Response Terakhir `POST /marketplace/listings/&#123;listingId&#125;/sold`</h3>
-                    <p className="muted-text">
-                      Sesuai bagian 3.1 panduan: jika tanpa <code>buyer_id</code>, <code>transaction</code> bernilai{" "}
-                      <code>null</code>.
-                    </p>
-                  </div>
-                  <button type="button" className="button-secondary" onClick={() => setLastMarkSoldResult(null)}>
-                    Tutup
-                  </button>
-                </div>
-                <pre className="code-preview">{JSON.stringify({ data: lastMarkSoldResult }, null, 2)}</pre>
-              </section>
-            )}
-
             <section className="section-card">
               <div className="card-header-inline">
                 <div>
-                  <h2>Daftar Listing Milik Sendiri (`GET /marketplace/me/listings`)</h2>
-                  <p className="muted-text">
-                    Menampilkan semua listing milik sendiri termasuk status <code>active</code>, <code>sold</code>,{" "}
-                    <code>expired</code>, dan <code>inactive</code>.
-                  </p>
+                  <h2>Daftar Iklan Saya</h2>
+                  <p className="muted-text">Kelola iklan yang sedang tayang maupun yang sudah terjual.</p>
                 </div>
-                <button
-                  type="button"
-                  className="button-secondary"
-                  onClick={() => void loadMyListingsAndQuota()}
-                  disabled={myListingsLoading}
-                >
-                  {myListingsLoading ? "Memuat..." : "Refresh"}
-                </button>
+                {accessToken && (
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={() => void loadMyListingsAndQuota()}
+                    disabled={myListingsLoading}
+                  >
+                    {myListingsLoading ? "Memuat..." : "Muat Ulang"}
+                  </button>
+                )}
               </div>
 
               {!accessToken ? (
                 <div className="empty-state">
-                  <p>Silakan login atau masukkan Bearer token pada tab Akun untuk melihat listing milik sendiri.</p>
+                  <p>Masuk ke akunmu untuk mulai memasang dan mengelola iklan.</p>
                   <button type="button" className="button-primary" onClick={() => setActiveTab("account")}>
-                    Buka Akun / Token
+                    Masuk ke Akun
                   </button>
                 </div>
               ) : myListings.length === 0 ? (
                 <div className="empty-state">
-                  <p>{myListingsLoading ? "Memuat listing..." : "Anda belum memiliki listing."}</p>
+                  <p>{myListingsLoading ? "Memuat iklan..." : "Kamu belum memasang iklan."}</p>
                 </div>
               ) : (
                 <div className="stack-list">
@@ -1937,13 +1868,13 @@ export function Marketplace() {
                             <span className="condition-tag">{CONDITION_LABELS[item.condition]}</span>
                             {item.moderation_hidden_at && (
                               <span className="status-badge status-rejected">
-                                Disembunyikan Admin ({item.moderation_reason || "Dalam moderasi"})
+                                Disembunyikan ({item.moderation_reason || "Sedang ditinjau"})
                               </span>
                             )}
                           </div>
                           <h3>{item.title}</h3>
                           <p className="muted-text">
-                            ID: <code>{item.id}</code> · {formatPrice(item.price)} · {item.category.name} ·{" "}
+                            <strong>{formatPrice(item.price)}</strong> · {item.category.name} ·{" "}
                             {item.location.kelurahan}
                           </p>
                         </div>
@@ -1954,7 +1885,7 @@ export function Marketplace() {
                               className="button-secondary"
                               onClick={() => startEditListing(item)}
                             >
-                              Ubah (`PATCH`)
+                              Ubah
                             </button>
                           )}
                           {item.status === "expired" && (
@@ -1963,7 +1894,7 @@ export function Marketplace() {
                               className="button-secondary"
                               onClick={() => void handleRenewListing(item.id)}
                             >
-                              Perpanjang (`renew`)
+                              Perpanjang
                             </button>
                           )}
                           {item.status === "inactive" && (
@@ -1972,7 +1903,7 @@ export function Marketplace() {
                               className="button-secondary"
                               onClick={() => void handleReactivateListing(item.id)}
                             >
-                              Aktifkan (`reactivate`)
+                              Aktifkan
                             </button>
                           )}
                           {item.status !== "sold" && (
@@ -1981,7 +1912,7 @@ export function Marketplace() {
                               className="button-secondary danger-btn"
                               onClick={() => void handleDeleteListing(item.id)}
                             >
-                              Arsipkan
+                              Hapus
                             </button>
                           )}
                         </div>
@@ -1989,15 +1920,14 @@ export function Marketplace() {
 
                       {item.status === "active" && (
                         <div className="sub-action-box">
-                          <strong>3.1 Tandai Listing Terjual (`POST /marketplace/listings/{item.id}/sold`)</strong>
+                          <strong>Sudah laku terjual?</strong>
                           <p className="muted-text">
-                            Kosongkan Buyer UUID untuk mencatat terjual tanpa pembeli (<code>transaction: null</code>),
-                            atau isi Buyer UUID terverifikasi untuk memulai transaksi <code>awaiting_confirmation</code>.
+                            Masukkan ID Akun pembeli jika ingin meminta konfirmasi dan ulasan, atau kosongkan bila terjual langsung.
                           </p>
                           <div className="inline-form">
                             <input
                               type="text"
-                              placeholder="Opsional: Buyer User UUID (HP terverifikasi)..."
+                              placeholder="ID Akun pembeli (opsional)"
                               value={soldBuyerInputs[item.id] ?? ""}
                               onChange={(e) =>
                                 setSoldBuyerInputs((curr) => ({ ...curr, [item.id]: e.target.value }))
@@ -2016,15 +1946,11 @@ export function Marketplace() {
 
                       {item.status === "sold" && (
                         <div className="sub-action-box">
-                          <strong>3.2 Tautkan / Ganti Pembeli (`POST /marketplace/listings/{item.id}/sale`)</strong>
-                          <p className="muted-text">
-                            Gunakan sebelum pembeli mengonfirmasi, atau setelah pembeli menolak / tautan sebelumnya
-                            dibatalkan. Listing tetap berstatus Sold.
-                          </p>
+                          <strong>Hubungkan atau ganti pembeli</strong>
                           <div className="inline-form">
                             <input
                               type="text"
-                              placeholder="Buyer User UUID baru (HP terverifikasi)..."
+                              placeholder="Masukkan ID Akun pembeli"
                               value={replaceBuyerInputs[item.id] ?? ""}
                               onChange={(e) =>
                                 setReplaceBuyerInputs((curr) => ({ ...curr, [item.id]: e.target.value }))
@@ -2035,7 +1961,7 @@ export function Marketplace() {
                               className="button-secondary"
                               onClick={() => void handleLinkOrReplaceBuyer(item.id)}
                             >
-                              Tautkan / Ganti Pembeli
+                              Simpan Pembeli
                             </button>
                           </div>
                         </div>
@@ -2046,7 +1972,7 @@ export function Marketplace() {
               )}
 
               {myListingsPagination.pages > 1 && (
-                <nav className="pagination" aria-label="Halaman listing saya">
+                <nav className="pagination" aria-label="Halaman iklan saya">
                   <button
                     type="button"
                     className="button-secondary"
@@ -2072,47 +1998,43 @@ export function Marketplace() {
           </div>
         )}
 
-        {/* ==================== TAB 3: TRANSAKSI & RATING ==================== */}
+        {/* ==================== TAB 3: TRANSAKSI & ULASAN ==================== */}
         {activeTab === "transactions" && (
           <div className="stack-layout">
             <div className="card-header-inline">
               <div>
-                <h2>Alur Transaksi & Rating</h2>
+                <h2>Transaksi & Ulasan</h2>
                 <p className="muted-text">
-                  Kelola konfirmasi pembelian (<code>CONFIRM</code> / <code>REJECT</code>), pemberian rating 1–5 pada
-                  transaksi <code>confirmed</code>, serta pembatalan atau penggantian pembeli oleh penjual.
+                  Konfirmasi barang yang kamu beli dan berikan penilaian untuk penjual.
                 </p>
               </div>
-              <button
-                type="button"
-                className="button-secondary"
-                onClick={() => void loadTransactions()}
-                disabled={txLoading}
-              >
-                {txLoading ? "Memuat..." : "Refresh Riwayat"}
-              </button>
+              {accessToken && (
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => void loadTransactions()}
+                  disabled={txLoading}
+                >
+                  {txLoading ? "Memuat..." : "Muat Ulang"}
+                </button>
+              )}
             </div>
 
             {!accessToken ? (
               <div className="empty-state">
-                <p>Silakan login terlebih dahulu untuk melihat riwayat pembelian dan penjualan terhubung.</p>
+                <p>Masuk ke akunmu untuk melihat riwayat pembelian dan penjualan.</p>
                 <button type="button" className="button-primary" onClick={() => setActiveTab("account")}>
-                  Buka Akun / Token
+                  Masuk ke Akun
                 </button>
               </div>
             ) : (
               <>
-                {/* PEMBELIAN SAYA (BUYER) */}
+                {/* PEMBELIAN SAYA */}
                 <section className="section-card">
-                  <h3>Riwayat Pembelian Terhubung (`GET /marketplace/me/purchases`)</h3>
-                  <p className="muted-text">
-                    Sebagai pembeli yang ditautkan, Anda dapat mengonfirmasi atau menolak transaksi{" "}
-                    <code>awaiting_confirmation</code>, dan memberi rating 1–5 setelah <code>confirmed</code>.
-                  </p>
-
+                  <h3>Pembelian Saya</h3>
                   {purchases.length === 0 ? (
                     <div className="empty-state">
-                      <p>{txLoading ? "Memuat pembelian..." : "Belum ada transaksi pembelian yang ditautkan ke akun Anda."}</p>
+                      <p>{txLoading ? "Memuat pembelian..." : "Belum ada transaksi pembelian."}</p>
                     </div>
                   ) : (
                     <div className="stack-list">
@@ -2121,15 +2043,11 @@ export function Marketplace() {
                           <div className="item-row-header">
                             <div>
                               <span className={`status-badge status-${tx.status}`}>
-                                {TRANSACTION_STATUS_LABELS[tx.status]} ({tx.status})
+                                {TRANSACTION_STATUS_LABELS[tx.status]}
                               </span>
                               <h3>{tx.listing.title}</h3>
                               <p className="muted-text">
-                                Sale ID: <code>{tx.id}</code> · Listing ID: <code>{tx.listing.id}</code> · Harga:{" "}
-                                <strong>{formatPrice(tx.listing.price)}</strong>
-                              </p>
-                              <p className="muted-text">
-                                Penjual:{" "}
+                                <strong>{formatPrice(tx.listing.price)}</strong> · Penjual:{" "}
                                 <button
                                   type="button"
                                   className="inline-link"
@@ -2138,24 +2056,24 @@ export function Marketplace() {
                                     void openPublicProfile(tx.seller.id);
                                   }}
                                 >
-                                  {tx.seller.display_name} ({tx.seller.id})
+                                  {tx.seller.display_name}
                                 </button>{" "}
-                                · Dibuat: {formatDate(tx.created_at)}
+                                · {formatDate(tx.created_at)}
                               </p>
                               {tx.response_note && (
-                                <p className="muted-text">Catatan Respons: &ldquo;{tx.response_note}&rdquo;</p>
+                                <p className="muted-text">Catatanmu: &ldquo;{tx.response_note}&rdquo;</p>
                               )}
                             </div>
                           </div>
 
                           {tx.status === "awaiting_confirmation" && (
                             <div className="sub-action-box">
-                              <strong>3.2 Konfirmasi atau Tolak Transaksi (`POST /marketplace/sales/{tx.id}/respond`)</strong>
+                              <strong>Konfirmasi penerimaan barang</strong>
                               <div className="inline-form">
                                 <input
                                   type="text"
                                   maxLength={500}
-                                  placeholder="Catatan opsional (maks. 500 karakter)..."
+                                  placeholder="Catatan singkat (opsional)"
                                   value={respondNotes[tx.id] ?? ""}
                                   onChange={(e) =>
                                     setRespondNotes((curr) => ({ ...curr, [tx.id]: e.target.value }))
@@ -2166,14 +2084,14 @@ export function Marketplace() {
                                   className="button-primary"
                                   onClick={() => void handleRespondSale(tx.id, "CONFIRM")}
                                 >
-                                  Konfirmasi (`CONFIRM`)
+                                  Terima Barang
                                 </button>
                                 <button
                                   type="button"
                                   className="button-secondary danger-btn"
                                   onClick={() => void handleRespondSale(tx.id, "REJECT")}
                                 >
-                                  Tolak (`REJECT`)
+                                  Tolak
                                 </button>
                               </div>
                             </div>
@@ -2181,42 +2099,39 @@ export function Marketplace() {
 
                           {tx.status === "confirmed" && (
                             <div className="sub-action-box">
-                              <strong>3.3 Beri Rating Penjual (`POST /marketplace/sales/{tx.id}/rating`)</strong>
                               {tx.rating ? (
                                 <p className="muted-text">
-                                  Rating tercatat: <strong>★ {tx.rating.score} / 5</strong> pada{" "}
-                                  {formatDate(tx.rating.created_at)}. Mengirim ulang skor yang sama bersifat idempoten;
-                                  mengubah skor menghasilkan <code>409 Conflict</code>.
+                                  Penilaianmu untuk transaksi ini: <strong>★ {tx.rating.score} / 5</strong>
                                 </p>
                               ) : (
-                                <p className="muted-text">
-                                  Pilih skor 1–5 untuk transaksi terkonfirmasi ini (hanya 1 rating per transaksi).
-                                </p>
+                                <>
+                                  <strong>Beri penilaian untuk penjual</strong>
+                                  <div className="inline-form">
+                                    <select
+                                      value={ratingScores[tx.id] ?? 5}
+                                      onChange={(e) =>
+                                        setRatingScores((curr) => ({
+                                          ...curr,
+                                          [tx.id]: Number.parseInt(e.target.value, 10),
+                                        }))
+                                      }
+                                    >
+                                      <option value={5}>★ 5 — Sangat Puas</option>
+                                      <option value={4}>★ 4 — Puas</option>
+                                      <option value={3}>★ 3 — Cukup</option>
+                                      <option value={2}>★ 2 — Kurang</option>
+                                      <option value={1}>★ 1 — Kecewa</option>
+                                    </select>
+                                    <button
+                                      type="button"
+                                      className="button-primary"
+                                      onClick={() => void handleRateSale(tx.id)}
+                                    >
+                                      Kirim Ulasan
+                                    </button>
+                                  </div>
+                                </>
                               )}
-                              <div className="inline-form">
-                                <select
-                                  value={ratingScores[tx.id] ?? tx.rating?.score ?? 5}
-                                  onChange={(e) =>
-                                    setRatingScores((curr) => ({
-                                      ...curr,
-                                      [tx.id]: Number.parseInt(e.target.value, 10),
-                                    }))
-                                  }
-                                >
-                                  <option value={5}>5 — Sangat Puas</option>
-                                  <option value={4}>4 — Puas</option>
-                                  <option value={3}>3 — Cukup</option>
-                                  <option value={2}>2 — Kurang</option>
-                                  <option value={1}>1 — Buruk</option>
-                                </select>
-                                <button
-                                  type="button"
-                                  className="button-primary"
-                                  onClick={() => void handleRateSale(tx.id)}
-                                >
-                                  Kirim Rating
-                                </button>
-                              </div>
                             </div>
                           )}
                         </article>
@@ -2225,17 +2140,12 @@ export function Marketplace() {
                   )}
                 </section>
 
-                {/* PENJUALAN SAYA (SELLER) */}
+                {/* PENJUALAN SAYA */}
                 <section className="section-card">
-                  <h3>Riwayat Penjualan Terhubung (`GET /marketplace/me/sales`)</h3>
-                  <p className="muted-text">
-                    Sebagai penjual, Anda dapat membatalkan tautan yang masih <code>awaiting_confirmation</code> atau
-                    menautkan pembeli baru jika ditolak/dibatalkan.
-                  </p>
-
+                  <h3>Penjualan Saya</h3>
                   {sales.length === 0 ? (
                     <div className="empty-state">
-                      <p>{txLoading ? "Memuat penjualan..." : "Belum ada riwayat penjualan terhubung."}</p>
+                      <p>{txLoading ? "Memuat penjualan..." : "Belum ada transaksi penjualan."}</p>
                     </div>
                   ) : (
                     <div className="stack-list">
@@ -2244,23 +2154,19 @@ export function Marketplace() {
                           <div className="item-row-header">
                             <div>
                               <span className={`status-badge status-${tx.status}`}>
-                                {TRANSACTION_STATUS_LABELS[tx.status]} ({tx.status})
+                                {TRANSACTION_STATUS_LABELS[tx.status]}
                               </span>
                               <h3>{tx.listing.title}</h3>
                               <p className="muted-text">
-                                Sale ID: <code>{tx.id}</code> · Listing ID: <code>{tx.listing.id}</code> · Harga:{" "}
-                                <strong>{formatPrice(tx.listing.price)}</strong>
-                              </p>
-                              <p className="muted-text">
-                                Pembeli: <strong>{tx.buyer.display_name}</strong> (<code>{tx.buyer.id}</code>) ·
-                                Dibuat: {formatDate(tx.created_at)}
+                                <strong>{formatPrice(tx.listing.price)}</strong> · Pembeli:{" "}
+                                <strong>{tx.buyer.display_name}</strong> · {formatDate(tx.created_at)}
                               </p>
                               {tx.response_note && (
-                                <p className="muted-text">Catatan Pembeli: &ldquo;{tx.response_note}&rdquo;</p>
+                                <p className="muted-text">Catatan pembeli: &ldquo;{tx.response_note}&rdquo;</p>
                               )}
                               {tx.rating && (
                                 <p className="muted-text">
-                                  Rating Diterima: <strong>★ {tx.rating.score} / 5</strong>
+                                  Ulasan pembeli: <strong>★ {tx.rating.score} / 5</strong>
                                 </p>
                               )}
                             </div>
@@ -2272,7 +2178,7 @@ export function Marketplace() {
                                   className="button-secondary danger-btn"
                                   onClick={() => void handleCancelSale(tx.id)}
                                 >
-                                  Batalkan Tautan (`DELETE`)
+                                  Batalkan
                                 </button>
                               </div>
                             )}
@@ -2284,14 +2190,13 @@ export function Marketplace() {
                             <div className="sub-action-box">
                               <strong>
                                 {tx.status === "awaiting_confirmation"
-                                  ? "Ganti Pembeli Sebelum Konfirmasi"
-                                  : "Tautkan Pembeli Baru (Listing Tetap Sold)"}{" "}
-                                (`POST /marketplace/listings/{tx.listing.id}/sale`)
+                                  ? "Salah memilih pembeli?"
+                                  : "Hubungkan dengan pembeli lain"}
                               </strong>
                               <div className="inline-form">
                                 <input
                                   type="text"
-                                  placeholder="Masukkan Buyer User UUID baru..."
+                                  placeholder="Masukkan ID Akun pembeli baru"
                                   value={replaceBuyerInputs[tx.listing.id] ?? ""}
                                   onChange={(e) =>
                                     setReplaceBuyerInputs((curr) => ({
@@ -2305,7 +2210,7 @@ export function Marketplace() {
                                   className="button-secondary"
                                   onClick={() => void handleLinkOrReplaceBuyer(tx.listing.id)}
                                 >
-                                  Simpan Pembeli Baru
+                                  Simpan
                                 </button>
                               </div>
                             </div>
@@ -2320,41 +2225,40 @@ export function Marketplace() {
           </div>
         )}
 
-        {/* ==================== TAB 4: LAPORAN PENGGUNA & LISTING ==================== */}
+        {/* ==================== TAB 4: BANTUAN & LAPORAN ==================== */}
         {activeTab === "reports" && (
           <div className="stack-layout">
             <section className="section-card">
-              <h2>4. Buat Laporan Listing atau Pengguna (`POST /marketplace/reports`)</h2>
+              <h2>Laporkan Masalah</h2>
               <p className="muted-text">
-                Satu pelapor hanya dapat memiliki satu laporan <code>open</code> untuk target yang sama; mengirim
-                duplikat saat masih <code>open</code> akan mengembalikan <code>409 Conflict</code>.
+                Laporkan iklan atau pengguna yang melanggar aturan komunitas kami.
               </p>
 
               <form className="form-grid" onSubmit={handleCreateReport}>
                 <label className="field">
-                  <span>Target Type (`target_type`)</span>
+                  <span>Yang Dilaporkan</span>
                   <select
                     value={reportTargetType}
                     onChange={(e) => setReportTargetType(e.target.value as ReportTargetType)}
                   >
-                    <option value="LISTING">LISTING</option>
-                    <option value="USER">USER</option>
+                    <option value="LISTING">Iklan Produk</option>
+                    <option value="USER">Pengguna / Penjual</option>
                   </select>
                 </label>
 
                 <label className="field">
-                  <span>Target UUID (`target_id`)</span>
+                  <span>ID Iklan atau Pengguna</span>
                   <input
                     type="text"
                     required
-                    placeholder="UUID listing atau pengguna..."
+                    placeholder="Masukkan ID..."
                     value={reportTargetId}
                     onChange={(e) => setReportTargetId(e.target.value)}
                   />
                 </label>
 
                 <label className="field span-2">
-                  <span>Alasan (`reason`)</span>
+                  <span>Alasan</span>
                   <select
                     value={reportReason}
                     onChange={(e) => setReportReason(e.target.value as ReportReason)}
@@ -2368,11 +2272,11 @@ export function Marketplace() {
                 </label>
 
                 <label className="field span-2">
-                  <span>Detail Tambahan (`details` — opsional, maks. 1000 karakter)</span>
+                  <span>Keterangan Tambahan</span>
                   <textarea
                     maxLength={1000}
                     rows={3}
-                    placeholder="Jelaskan detail pelanggaran..."
+                    placeholder="Ceritakan detail kendala yang kamu temukan..."
                     value={reportDetails}
                     onChange={(e) => setReportDetails(e.target.value)}
                   />
@@ -2389,26 +2293,28 @@ export function Marketplace() {
             <section className="section-card">
               <div className="card-header-inline">
                 <div>
-                  <h3>Riwayat Laporan Saya (`GET /marketplace/me/reports`)</h3>
-                  <p className="muted-text">Daftar laporan yang pernah Anda kirim beserta status peninjauan admin.</p>
+                  <h3>Riwayat Laporan Saya</h3>
+                  <p className="muted-text">Pantau status laporan yang pernah kamu kirimkan.</p>
                 </div>
-                <button
-                  type="button"
-                  className="button-secondary"
-                  onClick={() => void loadMyReports()}
-                  disabled={reportsLoading}
-                >
-                  {reportsLoading ? "Memuat..." : "Refresh"}
-                </button>
+                {accessToken && (
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={() => void loadMyReports()}
+                    disabled={reportsLoading}
+                  >
+                    {reportsLoading ? "Memuat..." : "Muat Ulang"}
+                  </button>
+                )}
               </div>
 
               {!accessToken ? (
                 <div className="empty-state">
-                  <p>Login untuk melihat riwayat laporan yang Anda buat.</p>
+                  <p>Masuk ke akunmu untuk melihat riwayat laporan.</p>
                 </div>
               ) : myReports.length === 0 ? (
                 <div className="empty-state">
-                  <p>{reportsLoading ? "Memuat laporan..." : "Belum ada laporan yang dibuat."}</p>
+                  <p>{reportsLoading ? "Memuat laporan..." : "Belum ada laporan yang kamu kirim."}</p>
                 </div>
               ) : (
                 <div className="stack-list">
@@ -2418,27 +2324,22 @@ export function Marketplace() {
                         <div>
                           <div className="listing-tags">
                             <span className={`status-badge status-${rep.status}`}>
-                              {rep.status.toUpperCase()}
+                              {REPORT_STATUS_LABELS[rep.status]}
                             </span>
-                            <span className="condition-tag">{rep.reason.toUpperCase()}</span>
-                            {rep.listing_hidden && (
-                              <span className="status-badge status-rejected">Listing Disembunyikan</span>
-                            )}
+                            <span className="condition-tag">
+                              {REPORT_REASON_LABELS[rep.reason.toUpperCase() as ReportReason] ?? rep.reason}
+                            </span>
                           </div>
                           <h3>
-                            Target:{" "}
                             {rep.target
-                              ? `${rep.target.type.toUpperCase()} — ${rep.target.title || rep.target.display_name || rep.target.id}`
-                              : "Target tidak tersedia"}
+                              ? rep.target.title || rep.target.display_name || "Laporan Komunitas"
+                              : "Data telah dihapus"}
                           </h3>
-                          <p className="muted-text">
-                            Report ID: <code>{rep.id}</code> · Target ID: <code>{rep.target?.id ?? "-"}</code> ·{" "}
-                            {formatDate(rep.created_at)}
-                          </p>
-                          {rep.details && <p className="muted-text">Detail: {rep.details}</p>}
+                          <p className="muted-text">Dikirim pada {formatDate(rep.created_at)}</p>
+                          {rep.details && <p className="muted-text">Keterangan: {rep.details}</p>}
                           {rep.review_note && (
                             <p className="muted-text">
-                              Catatan Admin ({rep.reviewed_by?.display_name ?? "Admin"}): &ldquo;{rep.review_note}&rdquo;
+                              Tanggapan moderator: &ldquo;{rep.review_note}&rdquo;
                             </p>
                           )}
                         </div>
@@ -2451,24 +2352,15 @@ export function Marketplace() {
           </div>
         )}
 
-        {/* ==================== TAB 5: PANEL ADMIN (MODERASI & KOREKSI) ==================== */}
+        {/* ==================== TAB 5: PANEL ADMIN ==================== */}
         {activeTab === "admin" && (
           <div className="stack-layout">
-            <div className="notice warning">
-              <strong>Area Khusus Admin.</strong> Semua endpoint di bawah hanya dapat diakses oleh akun dengan{" "}
-              <code>role: &quot;admin&quot;</code>. Jika diakses oleh non-admin, backend akan mengembalikan{" "}
-              <code>403 Forbidden</code> (sesuai Checklist QA #9).
-            </div>
-
-            {/* 1. Antrean Laporan Admin */}
+            {/* 1. Antrean Laporan */}
             <section className="section-card">
               <div className="card-header-inline">
                 <div>
-                  <h2>Antrean Laporan (`GET /marketplace/admin/reports`)</h2>
-                  <p className="muted-text">
-                    Tinjau laporan dengan keputusan <code>RESOLVED</code> atau <code>DISMISSED</code> beserta{" "}
-                    <code>review_note</code> wajib.
-                  </p>
+                  <h2>Tinjauan Laporan Pengguna</h2>
+                  <p className="muted-text">Periksa dan tindak lanjuti laporan yang masuk dari komunitas.</p>
                 </div>
                 <div className="inline-form">
                   <select
@@ -2477,10 +2369,10 @@ export function Marketplace() {
                       setAdminReportStatusFilter(e.target.value as AdminReportFilterStatus | "ALL")
                     }
                   >
-                    <option value="OPEN">Status: OPEN</option>
-                    <option value="RESOLVED">Status: RESOLVED</option>
-                    <option value="DISMISSED">Status: DISMISSED</option>
-                    <option value="ALL">Semua Status</option>
+                    <option value="OPEN">Menunggu Tinjauan</option>
+                    <option value="RESOLVED">Ditindaklanjuti</option>
+                    <option value="DISMISSED">Ditolak</option>
+                    <option value="ALL">Semua</option>
                   </select>
                   <button
                     type="button"
@@ -2488,14 +2380,14 @@ export function Marketplace() {
                     onClick={() => void loadAdminReports()}
                     disabled={adminReportsLoading}
                   >
-                    {adminReportsLoading ? "Memuat..." : "Muat Antrean"}
+                    {adminReportsLoading ? "Memuat..." : "Tampilkan"}
                   </button>
                 </div>
               </div>
 
               {adminReports.length === 0 ? (
                 <div className="empty-state">
-                  <p>Klik &ldquo;Muat Antrean&rdquo; untuk mengambil daftar laporan dari server.</p>
+                  <p>Belum ada daftar laporan yang ditampilkan.</p>
                 </div>
               ) : (
                 <div className="stack-list">
@@ -2504,26 +2396,28 @@ export function Marketplace() {
                       <div className="item-row-header">
                         <div>
                           <div className="listing-tags">
-                            <span className={`status-badge status-${rep.status}`}>{rep.status}</span>
-                            <span className="condition-tag">{rep.reason}</span>
+                            <span className={`status-badge status-${rep.status}`}>
+                              {REPORT_STATUS_LABELS[rep.status]}
+                            </span>
+                            <span className="condition-tag">
+                              {REPORT_REASON_LABELS[rep.reason.toUpperCase() as ReportReason] ?? rep.reason}
+                            </span>
                             {rep.listing_hidden && (
-                              <span className="status-badge status-rejected">Listing Hidden</span>
+                              <span className="status-badge status-rejected">Disembunyikan</span>
                             )}
                           </div>
                           <h3>
                             {rep.target
-                              ? `[${rep.target.type.toUpperCase()}] ${rep.target.title || rep.target.display_name || rep.target.id}`
-                              : "Target dihapus"}
+                              ? rep.target.title || rep.target.display_name || rep.target.id
+                              : "Data telah dihapus"}
                           </h3>
                           <p className="muted-text">
-                            Report ID: <code>{rep.id}</code> · Pelapor: {rep.reporter.display_name} (
-                            <code>{rep.reporter.id}</code>) · {formatDate(rep.created_at)}
+                            Pelapor: {rep.reporter.display_name} · {formatDate(rep.created_at)}
                           </p>
-                          {rep.details && <p className="muted-text">Detail Laporan: {rep.details}</p>}
+                          {rep.details && <p className="muted-text">Detail: {rep.details}</p>}
                           {rep.review_note && (
                             <p className="muted-text">
-                              Ditinjau oleh {rep.reviewed_by?.display_name}: &ldquo;{rep.review_note}&rdquo; (
-                              {formatDate(rep.reviewed_at)})
+                              Ditinjau oleh {rep.reviewed_by?.display_name}: &ldquo;{rep.review_note}&rdquo;
                             </p>
                           )}
                         </div>
@@ -2536,14 +2430,14 @@ export function Marketplace() {
                               void handleLoadModerationHistory(rep.target?.id ?? "");
                             }}
                           >
-                            Moderasi Listing Ini
+                            Kelola Iklan Ini
                           </button>
                         )}
                       </div>
 
                       {rep.status === "open" && (
                         <div className="sub-action-box">
-                          <strong>Review Laporan (`POST /marketplace/admin/reports/{rep.id}/review`)</strong>
+                          <strong>Berikan Keputusan</strong>
                           <div className="inline-form">
                             <select
                               value={adminReviewDecision[rep.id] ?? "RESOLVED"}
@@ -2554,13 +2448,13 @@ export function Marketplace() {
                                 }))
                               }
                             >
-                              <option value="RESOLVED">RESOLVED</option>
-                              <option value="DISMISSED">DISMISSED</option>
+                              <option value="RESOLVED">Tindak Lanjuti</option>
+                              <option value="DISMISSED">Tolak Laporan</option>
                             </select>
                             <input
                               type="text"
                               maxLength={500}
-                              placeholder="Catatan review (wajib diisi)..."
+                              placeholder="Tulis catatan hasil peninjauan..."
                               value={adminReviewNotes[rep.id] ?? ""}
                               onChange={(e) =>
                                 setAdminReviewNotes((curr) => ({ ...curr, [rep.id]: e.target.value }))
@@ -2571,7 +2465,7 @@ export function Marketplace() {
                               className="button-primary"
                               onClick={() => void handleAdminReviewReport(rep.id)}
                             >
-                              Kirim Keputusan
+                              Simpan
                             </button>
                           </div>
                         </div>
@@ -2582,44 +2476,43 @@ export function Marketplace() {
               )}
             </section>
 
-            {/* 2. Moderasi Hide / Restore Listing */}
+            {/* 2. Moderasi Iklan */}
             <section className="section-card">
-              <h2>Moderasi Listing (`GET, POST /marketplace/admin/listings/&#123;listingId&#125;/moderation`)</h2>
+              <h2>Moderasi Iklan</h2>
               <p className="muted-text">
-                Sembunyikan (<code>HIDE</code>) atau pulihkan (<code>RESTORE</code>) listing. Listing tersembunyi tidak
-                muncul di publik, tetapi tetap memakai kuota dan masa tayang.
+                Sembunyikan sementara iklan yang melanggar aturan atau tampilkan kembali setelah diperbaiki.
               </p>
 
               <form className="form-grid" onSubmit={handleModerateListing}>
                 <label className="field">
-                  <span>Listing UUID (`listingId`)</span>
+                  <span>ID Iklan</span>
                   <input
                     type="text"
                     required
-                    placeholder="Masukkan UUID listing..."
+                    placeholder="Masukkan ID iklan..."
                     value={modListingId}
                     onChange={(e) => setModListingId(e.target.value)}
                   />
                 </label>
 
                 <label className="field">
-                  <span>Tindakan (`action`)</span>
+                  <span>Tindakan</span>
                   <select
                     value={modAction}
                     onChange={(e) => setModAction(e.target.value as ModerationActionType)}
                   >
-                    <option value="HIDE">HIDE — Sembunyikan dari publik</option>
-                    <option value="RESTORE">RESTORE — Pulihkan ke publik</option>
+                    <option value="HIDE">Sembunyikan dari publik</option>
+                    <option value="RESTORE">Tampilkan kembali ke publik</option>
                   </select>
                 </label>
 
                 <label className="field span-2">
-                  <span>Alasan Moderasi (`reason` — wajib diisi, maks. 500 karakter)</span>
+                  <span>Alasan</span>
                   <input
                     type="text"
                     required
                     maxLength={500}
-                    placeholder="Contoh: Menunggu pemeriksaan laporan"
+                    placeholder="Tuliskan alasan tindakan..."
                     value={modReason}
                     onChange={(e) => setModReason(e.target.value)}
                   />
@@ -2632,35 +2525,34 @@ export function Marketplace() {
                     onClick={() => void handleLoadModerationHistory()}
                     disabled={modLoading || !modListingId.trim()}
                   >
-                    Lihat Riwayat Moderasi (`GET`)
+                    Lihat Riwayat
                   </button>
                   <button type="submit" className="button-primary" disabled={modLoading}>
-                    {modLoading ? "Memproses..." : `Jalankan ${modAction}`}
+                    {modLoading ? "Memproses..." : "Simpan Tindakan"}
                   </button>
                 </div>
               </form>
 
               {modResult && (
                 <div className="notice info">
-                  Status moderasi terbaru untuk listing <code>{modResult.id}</code>:{" "}
-                  <strong>hidden = {String(modResult.hidden)}</strong>{" "}
-                  {modResult.moderation_reason ? `(Alasan: ${modResult.moderation_reason})` : ""}
+                  Status iklan saat ini: <strong>{modResult.hidden ? "Disembunyikan" : "Ditampilkan"}</strong>
+                  {modResult.moderation_reason ? ` (${modResult.moderation_reason})` : ""}
                 </div>
               )}
 
               {modHistory.length > 0 && (
                 <div className="stack-list">
-                  <h4>Riwayat Tindakan Moderasi</h4>
+                  <h4>Riwayat Moderasi</h4>
                   {modHistory.map((act) => (
                     <div key={act.id} className="item-row-card compact-row">
                       <span className={`status-badge status-${act.action === "hide" ? "rejected" : "confirmed"}`}>
-                        {act.action.toUpperCase()}
+                        {act.action === "hide" ? "Disembunyikan" : "Dipulihkan"}
                       </span>
                       <span>
                         Alasan: <strong>{act.reason}</strong>
                       </span>
                       <span className="muted-text">
-                        Oleh {act.admin.display_name} pada {formatDate(act.created_at)}
+                        Oleh {act.admin.display_name} · {formatDate(act.created_at)}
                       </span>
                     </div>
                   ))}
@@ -2668,46 +2560,43 @@ export function Marketplace() {
               )}
             </section>
 
-            {/* 3. Koreksi Pembeli & Audit */}
+            {/* 3. Koreksi Pembeli */}
             <section className="section-card">
-              <h2>
-                Koreksi Pembeli Transaksi Terkonfirmasi (`POST /marketplace/admin/sales/&#123;saleId&#125;/correct-buyer`)
-              </h2>
+              <h2>Perbaikan Data Pembeli</h2>
               <p className="muted-text">
-                Menghapus rating lama, mencatat alasan/audit, dan mengembalikan status transaksi ke{" "}
-                <code>awaiting_confirmation</code> untuk pembeli baru.
+                Gunakan jika penjual tidak sengaja menghubungkan transaksi ke pembeli yang salah.
               </p>
 
               <form className="form-grid" onSubmit={handleCorrectBuyer}>
                 <label className="field">
-                  <span>Sale UUID (`saleId`)</span>
+                  <span>ID Transaksi</span>
                   <input
                     type="text"
                     required
-                    placeholder="UUID transaksi penjualan..."
+                    placeholder="Masukkan ID transaksi..."
                     value={correctSaleId}
                     onChange={(e) => setCorrectSaleId(e.target.value)}
                   />
                 </label>
 
                 <label className="field">
-                  <span>Buyer UUID Baru (`buyer_id`)</span>
+                  <span>ID Akun Pembeli Baru</span>
                   <input
                     type="text"
                     required
-                    placeholder="UUID pembeli baru (HP terverifikasi)..."
+                    placeholder="Masukkan ID pembeli yang benar..."
                     value={correctBuyerId}
                     onChange={(e) => setCorrectBuyerId(e.target.value)}
                   />
                 </label>
 
                 <label className="field span-2">
-                  <span>Alasan Koreksi (`reason` — wajib diisi)</span>
+                  <span>Alasan Perbaikan</span>
                   <input
                     type="text"
                     required
                     maxLength={500}
-                    placeholder="Contoh: Penjual salah menautkan akun pembeli saat transaksi..."
+                    placeholder="Contoh: Penjual salah memilih akun pembeli"
                     value={correctReason}
                     onChange={(e) => setCorrectReason(e.target.value)}
                   />
@@ -2720,28 +2609,26 @@ export function Marketplace() {
                     onClick={() => void handleLoadSaleCorrections()}
                     disabled={correctionsLoading || !correctSaleId.trim()}
                   >
-                    Lihat Audit Koreksi (`GET /corrections`)
+                    Lihat Riwayat Perbaikan
                   </button>
                   <button type="submit" className="button-primary" disabled={correctionsLoading}>
-                    {correctionsLoading ? "Memproses..." : "Koreksi Pembeli"}
+                    {correctionsLoading ? "Memproses..." : "Perbarui Pembeli"}
                   </button>
                 </div>
               </form>
 
               {saleCorrections.length > 0 && (
                 <div className="stack-list">
-                  <h4>Riwayat Audit Koreksi Pembeli</h4>
+                  <h4>Riwayat Perbaikan</h4>
                   {saleCorrections.map((corr) => (
                     <div key={corr.id} className="item-row-card compact-row">
-                      <span className="condition-tag">{corr.action}</span>
                       <span>
-                        Dari <strong>{corr.previous_buyer.display_name}</strong> (<code>{corr.previous_buyer.id}</code>)
-                        {" → "}
-                        Ke <strong>{corr.new_buyer.display_name}</strong> (<code>{corr.new_buyer.id}</code>)
+                        Dari <strong>{corr.previous_buyer.display_name}</strong> ke{" "}
+                        <strong>{corr.new_buyer.display_name}</strong>
                       </span>
                       <span>Alasan: &ldquo;{corr.reason}&rdquo;</span>
                       <span className="muted-text">
-                        Admin: {corr.admin.display_name} · {formatDate(corr.created_at)}
+                        Oleh {corr.admin.display_name} · {formatDate(corr.created_at)}
                       </span>
                     </div>
                   ))}
@@ -2751,74 +2638,49 @@ export function Marketplace() {
           </div>
         )}
 
-        {/* ==================== TAB 6: AKUN, VERIFIKASI OTP & BEARER TOKEN QA ==================== */}
+        {/* ==================== TAB 6: AKUN SAYA ==================== */}
         {activeTab === "account" && (
           <div className="stack-layout">
-            {/* Status Sesi Saat Ini */}
-            <section className="section-card">
-              <div className="card-header-inline">
-                <div>
-                  <h2>Status Autentikasi & Akun Saat Ini</h2>
-                  <p className="muted-text">
-                    Semua endpoint terproteksi mengirim header <code>Authorization: Bearer &lt;access-token&gt;</code>.
-                  </p>
-                </div>
-                {accessToken && (
+            {currentUser ? (
+              <section className="section-card">
+                <div className="card-header-inline">
+                  <div>
+                    <h2>Profil Saya</h2>
+                    <p className="muted-text">Informasi akun dan status verifikasi nomor HP kamu.</p>
+                  </div>
                   <button type="button" className="button-secondary danger-btn" onClick={handleLogout}>
-                    Logout / Hapus Token
+                    Keluar
                   </button>
-                )}
-              </div>
+                </div>
 
-              {currentUser ? (
                 <div className="profile-summary-box">
                   <div className="profile-summary-main">
                     <div>
-                      <strong>{currentUser.display_name}</strong> ({currentUser.email})
-                      <div className="listing-tags" style={{ marginTop: 6 }}>
-                        <span className="condition-tag">Role: {currentUser.role.toUpperCase()}</span>
-                        <span className="condition-tag">Tier: {currentUser.tier.toUpperCase()}</span>
+                      <strong>{currentUser.display_name}</strong>
+                      <p className="muted-text">{currentUser.email}</p>
+                      <div className="listing-tags" style={{ marginTop: 8 }}>
+                        <span className="condition-tag">{currentUser.tier.toUpperCase()}</span>
                         <span
                           className={`status-badge ${currentUser.phone_verified ? "status-confirmed" : "status-rejected"}`}
                         >
-                          {currentUser.phone_verified ? "✓ HP Terverifikasi" : "✕ HP Belum Terverifikasi"}
+                          {currentUser.phone_verified ? "✓ Nomor HP Terverifikasi" : "Nomor HP Belum Terverifikasi"}
                         </span>
                       </div>
-                      <p className="muted-text" style={{ marginTop: 6 }}>
-                        User UUID: <code>{currentUser.id}</code>
+                      <p className="muted-text" style={{ marginTop: 8 }}>
+                        ID Akun: <code>{currentUser.id}</code>
                       </p>
-                    </div>
-                    <div className="action-row">
-                      <button
-                        type="button"
-                        className="button-secondary"
-                        onClick={() => void fetchCurrentUser(accessToken)}
-                        disabled={authLoading}
-                      >
-                        Refresh `/users/me`
-                      </button>
-                      {refreshToken && (
-                        <button
-                          type="button"
-                          className="button-secondary"
-                          onClick={() => void handleRefreshToken()}
-                          disabled={authLoading}
-                        >
-                          Rotasi Refresh Token
-                        </button>
-                      )}
                     </div>
                   </div>
 
                   {!currentUser.phone_verified && (
                     <form className="sub-action-box" onSubmit={handleVerifyPhone}>
-                      <strong>Verifikasi Nomor HP (`POST /auth/verify-phone`)</strong>
+                      <strong>Verifikasi Nomor HP</strong>
                       <p className="muted-text">
-                        Masukkan kode OTP 6 digit. (Catatan QA: OTP development bukan provider OTP produksi).
+                        Masukkan 6 digit kode verifikasi yang dikirimkan ke nomor HP kamu.
                       </p>
                       {devOtpHint && (
                         <p className="muted-text">
-                          Kode <code>development_otp</code> terakhir: <strong>{devOtpHint}</strong>
+                          Kode verifikasi kamu: <strong>{devOtpHint}</strong>
                         </p>
                       )}
                       <div className="inline-form">
@@ -2827,12 +2689,12 @@ export function Marketplace() {
                           required
                           pattern="^[0-9]{6}$"
                           maxLength={6}
-                          placeholder="6 digit OTP..."
+                          placeholder="Masukkan 6 digit kode"
                           value={otpCode}
                           onChange={(e) => setOtpCode(e.target.value)}
                         />
                         <button type="submit" className="button-primary" disabled={authLoading}>
-                          Verifikasi OTP
+                          Verifikasi
                         </button>
                         <button
                           type="button"
@@ -2840,143 +2702,105 @@ export function Marketplace() {
                           onClick={() => void handleResendOtp()}
                           disabled={authLoading}
                         >
-                          Kirim Ulang OTP
+                          Kirim Ulang Kode
                         </button>
                       </div>
                     </form>
                   )}
                 </div>
-              ) : (
-                <p className="muted-text">
-                  Belum ada akun yang aktif (Mode Pengunjung Publik). Gunakan form Login, Registrasi, atau tempel
-                  Bearer Access Token secara langsung di bawah.
-                </p>
-              )}
-
-              {/* Input Manual Bearer Token untuk QA */}
-              <form className="sub-action-box" onSubmit={handleSaveManualToken}>
-                <strong>Input Langsung Bearer Access Token (Untuk Pengujian QA Multi-Akun)</strong>
-                <div className="inline-form">
-                  <input
-                    type="text"
-                    placeholder="Tempel JWT access_token di sini..."
-                    value={tokenInput}
-                    onChange={(e) => setTokenInput(e.target.value)}
-                  />
-                  <button type="submit" className="button-secondary">
-                    Gunakan Token
-                  </button>
-                </div>
-              </form>
-            </section>
-
-            {/* Login & Register */}
-            <div className="two-col-grid">
-              <section className="section-card">
-                <h3>Login (`POST /auth/login`)</h3>
-                <form className="form-stack" onSubmit={handleLogin}>
-                  <label className="field">
-                    <span>Email</span>
-                    <input
-                      type="email"
-                      required
-                      placeholder="nama@email.com"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Password</span>
-                    <input
-                      type="password"
-                      required
-                      placeholder="Password akun..."
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                    />
-                  </label>
-                  <button type="submit" className="button-primary" disabled={authLoading}>
-                    {authLoading ? "Memproses..." : "Login"}
-                  </button>
-                </form>
               </section>
+            ) : (
+              <div className="two-col-grid">
+                <section className="section-card">
+                  <div>
+                    <h2>Masuk</h2>
+                    <p className="muted-text">Masuk ke akun Aquaku untuk mulai bertransaksi.</p>
+                  </div>
+                  <form className="form-stack" onSubmit={handleLogin}>
+                    <label className="field">
+                      <span>Email</span>
+                      <input
+                        type="email"
+                        required
+                        placeholder="nama@email.com"
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Kata Sandi</span>
+                      <input
+                        type="password"
+                        required
+                        placeholder="Masukkan kata sandi"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                      />
+                    </label>
+                    <button type="submit" className="button-primary" disabled={authLoading}>
+                      {authLoading ? "Memproses..." : "Masuk"}
+                    </button>
+                  </form>
+                </section>
 
-              <section className="section-card">
-                <h3>Daftar Akun Baru (`POST /auth/register`)</h3>
-                <form className="form-stack" onSubmit={handleRegister}>
-                  <label className="field">
-                    <span>Nama Tampilan (`display_name`)</span>
-                    <input
-                      type="text"
-                      required
-                      maxLength={80}
-                      placeholder="Nama pengguna / toko"
-                      value={regDisplayName}
-                      onChange={(e) => setRegDisplayName(e.target.value)}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Email</span>
-                    <input
-                      type="email"
-                      required
-                      placeholder="nama@email.com"
-                      value={regEmail}
-                      onChange={(e) => setRegEmail(e.target.value)}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Nomor HP (`phone_number`, 8–24 karakter)</span>
-                    <input
-                      type="tel"
-                      required
-                      minLength={8}
-                      maxLength={24}
-                      placeholder="081234567890"
-                      value={regPhone}
-                      onChange={(e) => setRegPhone(e.target.value)}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Password (minimal 12 karakter)</span>
-                    <input
-                      type="password"
-                      required
-                      minLength={12}
-                      maxLength={128}
-                      placeholder="Minimal 12 karakter..."
-                      value={regPassword}
-                      onChange={(e) => setRegPassword(e.target.value)}
-                    />
-                  </label>
-                  <button type="submit" className="button-secondary" disabled={authLoading}>
-                    {authLoading ? "Mendaftarkan..." : "Daftar & Minta OTP"}
-                  </button>
-                </form>
-              </section>
-            </div>
-
-            {/* Ringkasan Checklist QA & Batasan sesuai docs.md Seksi 6 & 7 */}
-            <section className="section-card">
-              <h3>6. Checklist QA Integrasi & 7. Batasan Rilis (Sesuai `docs.md`)</h3>
-              <ol className="qa-checklist">
-                <li>Pengunjung tanpa login dapat mencari listing aktif dan membuka profil publik (Tab Jelajah).</li>
-                <li>Akun tanpa HP terverifikasi ditolak (<code>403 Forbidden</code>) saat melakukan tindakan yang mewajibkan verifikasi.</li>
-                <li>Penjual menandai listing terjual tanpa pembeli; response memiliki <code>transaction: null</code> (Tab Listing Saya).</li>
-                <li>Penjual menandai terjual dengan pembeli verified; pembeli yang salah ditolak, pembeli benar dapat konfirmasi (Tab Transaksi).</li>
-                <li>Rating sebelum konfirmasi atau dari akun lain ditolak; rating 1–5 setelah konfirmasi diterima dan hanya satu per transaksi.</li>
-                <li>Pembeli menolak transaksi (<code>REJECT</code>); listing tetap <code>Sold</code> dan penjual dapat menghubungkan pembeli baru.</li>
-                <li>Admin mengoreksi pembeli; rating lama hilang, alasan tersimpan, dan pembeli baru perlu konfirmasi ulang (Tab Admin).</li>
-                <li>Pengguna membuat laporan listing/pengguna, melihat laporan sendiri, dan tidak dapat mengirim laporan Open duplikat pada target yang sama (Tab Laporan).</li>
-                <li>Non-admin tidak dapat membuka antrean atau endpoint moderasi admin (Tab Admin).</li>
-                <li>Admin hide/restore listing; listing hidden tidak dapat dibuka publik, tetap ada di kuota, dan riwayat tindakan menampilkan alasan.</li>
-              </ol>
-              <p className="muted-text small-note">
-                Batasan: Konfirmasi pembeli dan rating bukan bukti pembayaran independen (checkout/escrow/payment
-                gateway tidak tersedia). Upload foto memerlukan kredensial Cloudinary yang valid (tanpa konfigurasi
-                mengembalikan <code>503</code>). Kode wilayah ditujukan untuk Kota Semarang.
-              </p>
-            </section>
+                <section className="section-card">
+                  <div>
+                    <h2>Daftar Akun Baru</h2>
+                    <p className="muted-text">Gabung bersama komunitas aquascape Semarang.</p>
+                  </div>
+                  <form className="form-stack" onSubmit={handleRegister}>
+                    <label className="field">
+                      <span>Nama Lengkap atau Nama Toko</span>
+                      <input
+                        type="text"
+                        required
+                        maxLength={80}
+                        placeholder="Contoh: Kebun Air Semarang"
+                        value={regDisplayName}
+                        onChange={(e) => setRegDisplayName(e.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Email</span>
+                      <input
+                        type="email"
+                        required
+                        placeholder="nama@email.com"
+                        value={regEmail}
+                        onChange={(e) => setRegEmail(e.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Nomor WhatsApp / HP</span>
+                      <input
+                        type="tel"
+                        required
+                        minLength={8}
+                        maxLength={24}
+                        placeholder="081234567890"
+                        value={regPhone}
+                        onChange={(e) => setRegPhone(e.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Kata Sandi</span>
+                      <input
+                        type="password"
+                        required
+                        minLength={12}
+                        maxLength={128}
+                        placeholder="Minimal 12 karakter"
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                      />
+                    </label>
+                    <button type="submit" className="button-secondary" disabled={authLoading}>
+                      {authLoading ? "Mendaftarkan..." : "Buat Akun"}
+                    </button>
+                  </form>
+                </section>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -2997,7 +2821,7 @@ export function Marketplace() {
           onClick={() => setActiveTab("my-listings")}
         >
           <Icon name="box" />
-          <span>Listingku</span>
+          <span>Lapakku</span>
         </button>
         <button
           type="button"
@@ -3013,16 +2837,18 @@ export function Marketplace() {
           onClick={() => setActiveTab("reports")}
         >
           <Icon name="flag" />
-          <span>Laporan</span>
+          <span>Bantuan</span>
         </button>
-        <button
-          type="button"
-          className={`mobile-nav-item ${activeTab === "admin" ? "active" : ""}`}
-          onClick={() => setActiveTab("admin")}
-        >
-          <Icon name="shield" />
-          <span>Admin</span>
-        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeTab === "admin" ? "active" : ""}`}
+            onClick={() => setActiveTab("admin")}
+          >
+            <Icon name="shield" />
+            <span>Admin</span>
+          </button>
+        )}
         <button
           type="button"
           className={`mobile-nav-item ${activeTab === "account" ? "active" : ""}`}
@@ -3033,7 +2859,7 @@ export function Marketplace() {
         </button>
       </nav>
 
-      {/* Modal Detail Listing Publik */}
+      {/* Modal Detail Produk */}
       {selectedListing && (
         <div
           className="modal-backdrop"
@@ -3047,15 +2873,13 @@ export function Marketplace() {
               ×
             </button>
             {detailLoading ? (
-              <p className="detail-message">Memuat detail listing...</p>
+              <p className="detail-message">Memuat informasi produk...</p>
             ) : detailError ? (
               <div className="detail-content">
                 <p className="error-text" role="alert">
                   {detailError}
                 </p>
-                <p className="muted-text">
-                  Listing mungkin sudah tidak tersedia secara publik atau disembunyikan oleh moderator (404 Not Found).
-                </p>
+                <p className="muted-text">Produk ini mungkin sudah terjual atau tidak lagi tersedia.</p>
               </div>
             ) : (
               <>
@@ -3072,15 +2896,13 @@ export function Marketplace() {
                   <p className="detail-description">{selectedListing.description}</p>
                   <div className="detail-meta">
                     <span>
-                      <Icon name="pin" /> {selectedListing.location.kelurahan}, {selectedListing.location.district} (
-                      {selectedListing.location.code})
+                      <Icon name="pin" /> {selectedListing.location.kelurahan}, {selectedListing.location.district}
                     </span>
                     <span>
                       Penjual: <strong>{selectedListing.seller.display_name || "Penjual Aquaku"}</strong>
-                      {selectedListing.seller.verified_store ? " · ✓ Terverifikasi" : ""}
+                      {selectedListing.seller.verified_store ? " · ✓ Toko Terverifikasi" : ""}
                     </span>
-                    <span>Listing ID: {selectedListing.id}</span>
-                    <span>Dipasang {formatDate(selectedListing.created_at)}</span>
+                    <span>Ditayangkan {formatDate(selectedListing.created_at)}</span>
                   </div>
 
                   <div className="modal-actions">
@@ -3091,7 +2913,7 @@ export function Marketplace() {
                         target="_blank"
                         rel="noreferrer"
                       >
-                        Hubungi Penjual via WhatsApp
+                        Hubungi via WhatsApp
                       </a>
                     )}
                     <div className="action-row">
@@ -3104,28 +2926,30 @@ export function Marketplace() {
                           void openPublicProfile(sellerId);
                         }}
                       >
-                        Lihat Profil & Rating Penjual
+                        Profil Penjual
                       </button>
                       <button
                         type="button"
                         className="button-secondary"
                         onClick={() => prefillReport("LISTING", selectedListing.id)}
                       >
-                        Laporkan Listing
+                        Laporkan Iklan
                       </button>
-                      <button
-                        type="button"
-                        className="button-secondary"
-                        onClick={() => {
-                          const targetId = selectedListing.id;
-                          closeListing();
-                          setModListingId(targetId);
-                          setActiveTab("admin");
-                          void handleLoadModerationHistory(targetId);
-                        }}
-                      >
-                        Moderasi (Admin)
-                      </button>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          className="button-secondary"
+                          onClick={() => {
+                            const targetId = selectedListing.id;
+                            closeListing();
+                            setModListingId(targetId);
+                            setActiveTab("admin");
+                            void handleLoadModerationHistory(targetId);
+                          }}
+                        >
+                          Moderasi
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3145,7 +2969,7 @@ function ListingCard({ listing, onOpen }: { listing: Listing; onOpen: () => void
       <div className="listing-info">
         <div className="listing-tags">
           <span className="condition-tag">{CONDITION_LABELS[listing.condition]}</span>
-          {listing.seller.verified_store && <span className="verified-tag">✓ Toko terverifikasi</span>}
+          {listing.seller.verified_store && <span className="verified-tag">✓ Terverifikasi</span>}
         </div>
         <h3>{listing.title}</h3>
         <p className="listing-category">
