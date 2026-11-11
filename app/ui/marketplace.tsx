@@ -58,7 +58,7 @@ function formatDate(value: string) {
 
 function getErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
-    if (error.status === 502) return "Backend API belum bisa dihubungi. Pastikan server backend aktif di port 3000.";
+    if (error.status === 502) return "Backend API belum bisa dihubungi. Periksa koneksi atau konfigurasi URL backend.";
     return error.message;
   }
   return error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";

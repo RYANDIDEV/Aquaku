@@ -12,7 +12,7 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Next.js berjalan di `http://localhost:3001`. Backend development menggunakan `http://localhost:3000/api/v1`, sehingga keduanya tidak berebut port. Jika alamat backend berbeda, ubah `AQUAKU_API_BASE_URL` pada `.env.local`.
+Next.js berjalan di `http://localhost:3001`. Secara default frontend memakai backend staging yang tercantum di `openapi.yaml`. Untuk backend lokal, ubah `AQUAKU_API_BASE_URL` pada `.env.local` menjadi `http://localhost:3000/api/v1`.
 
 Route handler Next.js di `/api/v1/*` meneruskan request ke backend, termasuk query string dan bearer token, agar browser tetap memakai same-origin. Endpoint publik Marketplace yang digunakan:
 
@@ -21,7 +21,7 @@ Route handler Next.js di `/api/v1/*` meneruskan request ke backend, termasuk que
 - `GET /marketplace/taxonomy`
 - `GET /marketplace/regions`
 
-API backend tidak tersedia di repository ini. Jika backend belum berjalan, antarmuka akan menampilkan status kegagalan koneksi, bukan data listing contoh.
+Backend tidak tersedia di repository ini. Jika API gagal dihubungi, antarmuka menampilkan status dan pesan kegagalan koneksi, bukan data listing contoh.
 
 ## Pemeriksaan
 

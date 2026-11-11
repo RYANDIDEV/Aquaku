@@ -4,7 +4,6 @@ type RouteContext = {
   params: Promise<{ path: string[] }>;
 };
 
-const METHODS = ["GET", "POST", "PATCH", "DELETE"] as const;
 const FORWARDED_REQUEST_HEADERS = ["accept", "authorization", "content-type"] as const;
 
 async function proxyRequest(request: NextRequest, context: RouteContext) {
@@ -19,7 +18,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
 
   let upstreamUrl: URL;
   try {
-    const baseUrl = process.env.AQUAKU_API_BASE_URL ?? "http://localhost:3000/api/v1";
+    const baseUrl = process.env.AQUAKU_API_BASE_URL ?? "https://aquaku-backend-staging.up.railway.app/api/v1";
     upstreamUrl = new URL(baseUrl);
     if (upstreamUrl.protocol !== "http:" && upstreamUrl.protocol !== "https:") {
       throw new Error("AQUAKU_API_BASE_URL harus menggunakan HTTP atau HTTPS.");

@@ -32,7 +32,7 @@
 }
 
 * { box-sizing: border-box; }
-html { min-width: 320px; background: var(--canvas); }
+html { background: var(--canvas); }
 body { margin: 0; color: var(--ink); background: var(--canvas); font-size: 14px; }
 button, input, select { font: inherit; }
 button, a, select { -webkit-tap-highlight-color: transparent; }
